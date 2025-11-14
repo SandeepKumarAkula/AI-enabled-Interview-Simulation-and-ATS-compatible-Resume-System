@@ -32,7 +32,7 @@ export default function TwoColumnTemplate({ data }: TwoColumnTemplateProps) {
       >
         <div style={{ marginBottom: "24px" }}>
           <h1 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 8px 0" }}>{data.fullName || "Your Name"}</h1>
-          <div style={{ color: "#d1d5db", fontSize: "11px", space: "1px", marginTop: "8px" }}>
+          <div style={{ color: "#d1d5db", fontSize: "11px", marginTop: "8px" }}>
             {data.email && <div style={{ marginBottom: "2px" }}>📧 {data.email}</div>}
             {data.phone && <div style={{ marginBottom: "2px" }}>📞 {data.phone}</div>}
             {data.location && <div style={{ marginBottom: "2px" }}>📍 {data.location}</div>}
