@@ -7,9 +7,14 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
           <div className="md:col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded bg-[#2ecc71] flex items-center justify-center">
-                <span className="text-white text-sm font-bold">A</span>
-              </div>
+              {/* Tab favicon replica - exact same SVG with green box background */}
+            <div className="w-8 h-8 rounded flex items-center justify-center" style={{ backgroundColor: '#2ecc71' }}>
+              <img
+                src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50' y='75' font-size='80' font-weight='bold' text-anchor='middle' fill='white'>A</text></svg>"
+                alt="AI²SARS Logo"
+                className="w-6 h-6"
+              />
+            </div>
               <span className="font-bold text-[#222222]">AI²SARS</span>
             </div>
             <p className="text-sm text-[#666666]">AI-enabled Interview Simulation and ATS-compatible Resume System</p>
@@ -72,3 +77,4 @@ export default function Footer() {
     </footer>
   )
 }
+
