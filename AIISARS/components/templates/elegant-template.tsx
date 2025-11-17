@@ -7,6 +7,13 @@ interface TemplateProps {
 }
 
 export default function ElegantTemplate({ data }: TemplateProps) {
+  const formatDate = (dateString: string) => {
+    if (!dateString) return ""
+    const [year, month] = dateString.split("-")
+    const date = new Date(Number.parseInt(year), Number.parseInt(month) - 1)
+    return date.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+  }
+
   return (
     <div
       style={{
@@ -18,13 +25,20 @@ export default function ElegantTemplate({ data }: TemplateProps) {
         fontSize: "11px",
       }}
     >
-      {/* Header with Gold Accent */}
+      {/* Header */}
       <div style={{ marginBottom: "20px", paddingBottom: "16px", borderBottom: "4px solid #b45309" }}>
         <h1
-          style={{ fontSize: "24px", fontWeight: "300", letterSpacing: "1px", color: "#111827", margin: "0 0 4px 0" }}
+          style={{
+            fontSize: "24px",
+            fontWeight: "300",
+            letterSpacing: "1px",
+            color: "#111827",
+            margin: "0 0 4px 0",
+          }}
         >
           {data.fullName}
         </h1>
+
         <div
           style={{
             fontSize: "10px",
@@ -69,24 +83,38 @@ export default function ElegantTemplate({ data }: TemplateProps) {
           >
             Experience
           </h2>
+
           {data.experience.map((exp) => (
             <div
               key={exp.id}
-              style={{ marginBottom: "12px", paddingBottom: "12px", borderBottom: "1px solid #e5e7eb" }}
+              style={{
+                marginBottom: "12px",
+                paddingBottom: "12px",
+                borderBottom: "1px solid #e5e7eb",
+              }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
-                <span style={{ fontWeight: "600", color: "#111827", fontSize: "11px" }}>{exp.jobTitle}</span>
-                {exp.startDate && (
-                  <span style={{ color: "#666", fontSize: "9px" }}>
-                    {exp.startDate}
-                    {exp.endDate && !exp.currentlyWorking && ` – ${exp.endDate}`}
-                    {exp.currentlyWorking && " – Present"}
-                  </span>
-                )}
+                <span style={{ fontWeight: "600", color: "#111827", fontSize: "11px" }}>
+                  {exp.jobTitle}
+                </span>
+
+                <span style={{ color: "#666", fontSize: "9px" }}>
+                  {formatDate(exp.startDate)} –{" "}
+                  {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
+                </span>
               </div>
+
               <div style={{ color: "#555", fontWeight: "300", fontSize: "10px" }}>{exp.company}</div>
+
               {exp.description && (
-                <div style={{ color: "#333", marginTop: "4px", fontSize: "10px", whiteSpace: "pre-wrap" }}>
+                <div
+                  style={{
+                    color: "#333",
+                    marginTop: "4px",
+                    fontSize: "10px",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
                   {exp.description}
                 </div>
               )}
@@ -95,7 +123,7 @@ export default function ElegantTemplate({ data }: TemplateProps) {
         </div>
       )}
 
-      {/* Education */}
+      {/* Education (UPDATED COMPLETELY) */}
       {data.education.length > 0 && (
         <div style={{ marginBottom: "16px" }}>
           <h2
@@ -110,13 +138,44 @@ export default function ElegantTemplate({ data }: TemplateProps) {
           >
             Education
           </h2>
+
           {data.education.map((edu) => (
             <div key={edu.id} style={{ marginBottom: "12px" }}>
+              {/* University + Dates */}
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
-                <span style={{ fontWeight: "600", color: "#111827", fontSize: "11px" }}>{edu.degree}</span>
-                {edu.graduationDate && <span style={{ color: "#666", fontSize: "9px" }}>{edu.graduationDate}</span>}
+                <span style={{ fontWeight: "600", color: "#111827", fontSize: "11px" }}>{edu.school}</span>
+
+                <span style={{ color: "#666", fontSize: "9px" }}>
+                  {formatDate(edu.startDate)} –{" "}
+                  {edu.endDate ? formatDate(edu.endDate) : "Present"}
+                </span>
               </div>
-              <div style={{ color: "#555", fontWeight: "300", fontSize: "10px" }}>{edu.school}</div>
+
+              {/* Degree + Field */}
+              <div style={{ color: "#555", fontWeight: "300", fontSize: "10px" }}>
+                {edu.degree} {edu.field && `in ${edu.field}`}
+              </div>
+
+              {/* CGPA */}
+              {edu.cgpa && (
+                <div style={{ color: "#444", fontSize: "10px", marginTop: "2px" }}>
+                  <strong>CGPA:</strong> {edu.cgpa}
+                </div>
+              )}
+
+              {/* Description */}
+              {edu.description && (
+                <div
+                  style={{
+                    color: "#333",
+                    marginTop: "4px",
+                    fontSize: "10px",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {edu.description}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -137,6 +196,7 @@ export default function ElegantTemplate({ data }: TemplateProps) {
           >
             Skills
           </h2>
+
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
             {data.skills.map((skill) => (
               <span
@@ -173,11 +233,19 @@ export default function ElegantTemplate({ data }: TemplateProps) {
               >
                 {field.heading}
               </h2>
-              <div style={{ color: "#333", textAlign: "justify", fontSize: "10px", whiteSpace: "pre-wrap" }}>
+
+              <div
+                style={{
+                  color: "#333",
+                  textAlign: "justify",
+                  fontSize: "10px",
+                  whiteSpace: "pre-wrap",
+                }}
+              >
                 {field.content}
               </div>
             </div>
-          ),
+          )
       )}
     </div>
   )

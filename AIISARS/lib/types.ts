@@ -14,9 +14,13 @@ export interface Education {
   school: string
   degree: string
   field: string
+  startDate: string
+  endDate: string
   graduationDate: string
+  cgpa: string
   description: string
 }
+
 
 export interface Skill {
   id: string

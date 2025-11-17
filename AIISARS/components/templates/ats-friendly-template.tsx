@@ -24,9 +24,11 @@ export default function ATSFriendlyTemplate({ data }: ATSFriendlyTemplateProps) 
         fontSize: "12px",
       }}
     >
-      {/* Header - ATS optimized */}
+      {/* HEADER */}
       <div style={{ marginBottom: "16px" }}>
-        <h1 style={{ fontSize: "14px", fontWeight: "bold", margin: "0 0 8px 0" }}>{data.fullName || "Your Name"}</h1>
+        <h1 style={{ fontSize: "14px", fontWeight: "bold", margin: "0 0 8px 0" }}>
+          {data.fullName || "Your Name"}
+        </h1>
         <div style={{ fontSize: "11px", color: "#333" }}>
           {data.email && <span>{data.email} | </span>}
           {data.phone && <span>{data.phone} | </span>}
@@ -34,73 +36,95 @@ export default function ATSFriendlyTemplate({ data }: ATSFriendlyTemplateProps) 
         </div>
       </div>
 
-      {/* Professional Summary */}
+      {/* SUMMARY */}
       {data.summary && (
         <div style={{ marginBottom: "16px" }}>
-          <p style={{ fontSize: "11px", color: "#333", lineHeight: "1.5", margin: "0", whiteSpace: "pre-wrap" }}>
+          <p style={{ fontSize: "11px", color: "#333", lineHeight: "1.5", whiteSpace: "pre-wrap" }}>
             {data.summary}
           </p>
         </div>
       )}
 
-      {/* Experience */}
+      {/* EXPERIENCE */}
       {data.experience.length > 0 && (
         <div style={{ marginBottom: "16px" }}>
           <div style={{ fontSize: "12px", fontWeight: "bold", textTransform: "uppercase", marginBottom: "8px" }}>
             Experience
           </div>
-          <div>
-            {data.experience.map((exp) => (
-              <div key={exp.id} style={{ fontSize: "11px", marginBottom: "12px" }}>
-                <div style={{ fontWeight: "bold" }}>{exp.jobTitle}</div>
-                <div>
-                  {exp.company}, {exp.location}
-                </div>
-                <div style={{ color: "#555" }}>
-                  {formatDate(exp.startDate)} to {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
-                </div>
-                {exp.description && (
-                  <p style={{ marginTop: "4px", color: "#333", whiteSpace: "pre-wrap", margin: "4px 0 0 0" }}>
-                    {exp.description}
-                  </p>
-                )}
+
+          {data.experience.map((exp) => (
+            <div key={exp.id} style={{ fontSize: "11px", marginBottom: "12px" }}>
+              <div style={{ fontWeight: "bold" }}>{exp.jobTitle}</div>
+
+              <div>
+                {exp.company}, {exp.location}
               </div>
-            ))}
-          </div>
+
+              <div style={{ color: "#555" }}>
+                {formatDate(exp.startDate)} to{" "}
+                {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
+              </div>
+
+              {exp.description && (
+                <p style={{ color: "#333", whiteSpace: "pre-wrap", marginTop: "4px" }}>
+                  {exp.description}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Education */}
+      {/* EDUCATION (UPDATED) */}
       {data.education.length > 0 && (
         <div style={{ marginBottom: "16px" }}>
           <div style={{ fontSize: "12px", fontWeight: "bold", textTransform: "uppercase", marginBottom: "8px" }}>
             Education
           </div>
-          <div>
-            {data.education.map((edu) => (
-              <div key={edu.id} style={{ fontSize: "11px", marginBottom: "8px" }}>
-                <div style={{ fontWeight: "bold" }}>{edu.degree}</div>
-                <div>
-                  {edu.school}, {edu.field}
-                </div>
-                <div style={{ color: "#555" }}>Graduated: {formatDate(edu.graduationDate)}</div>
-                {edu.description && (
-                  <p style={{ marginTop: "4px", color: "#333", margin: "4px 0 0 0" }}>{edu.description}</p>
-                )}
+
+          {data.education.map((edu) => (
+            <div key={edu.id} style={{ fontSize: "11px", marginBottom: "12px" }}>
+              {/* Degree */}
+              <div style={{ fontWeight: "bold" }}>{edu.degree}</div>
+
+              {/* School + Field */}
+              <div>
+                {edu.school}
+                {edu.field ? `, ${edu.field}` : ""}
               </div>
-            ))}
-          </div>
+
+              {/* Start–End Dates */}
+              <div style={{ color: "#555" }}>
+                {formatDate(edu.startDate)} – {edu.endDate ? formatDate(edu.endDate) : "Present"}
+              </div>
+
+              {/* CGPA */}
+              {edu.cgpa && (
+                <div style={{ marginTop: "2px", color: "#444" }}>
+                  <strong>CGPA:</strong> {edu.cgpa}
+                </div>
+              )}
+
+              {/* Description */}
+              {edu.description && (
+                <p style={{ marginTop: "4px", color: "#333", whiteSpace: "pre-wrap" }}>
+                  {edu.description}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Skills - ATS friendly format */}
+      {/* SKILLS */}
       {data.skills.length > 0 && (
         <div style={{ marginBottom: "16px" }}>
           <div style={{ fontSize: "12px", fontWeight: "bold", textTransform: "uppercase", marginBottom: "8px" }}>
             Skills
           </div>
+
           <div style={{ fontSize: "11px", color: "#333" }}>
-            {data.skills.map((skill, idx) => (
+            {data.skills.map((skill) => (
               <div key={skill.id}>
                 {skill.name} ({skill.level})
               </div>
@@ -109,13 +133,16 @@ export default function ATSFriendlyTemplate({ data }: ATSFriendlyTemplateProps) 
         </div>
       )}
 
-      {/* Custom Fields */}
+      {/* CUSTOM FIELDS */}
       {data.customFields.map((field) => (
         <div key={field.id} style={{ marginBottom: "16px" }}>
           <div style={{ fontSize: "12px", fontWeight: "bold", textTransform: "uppercase", marginBottom: "8px" }}>
             {field.heading}
           </div>
-          <p style={{ fontSize: "11px", color: "#333", margin: "0", whiteSpace: "pre-wrap" }}>{field.content}</p>
+
+          <p style={{ fontSize: "11px", color: "#333", whiteSpace: "pre-wrap" }}>
+            {field.content}
+          </p>
         </div>
       ))}
     </div>

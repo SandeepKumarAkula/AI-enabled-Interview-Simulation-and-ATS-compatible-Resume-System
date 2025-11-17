@@ -19,28 +19,27 @@ export default function AcademicTemplate({ data }: TemplateProps) {
         lineHeight: "1.4",
       }}
     >
-      {/* Header */}
+      {/* ================= HEADER ================= */}
       <div style={{ marginBottom: "16px", textAlign: "center", borderBottom: "2px solid #000", paddingBottom: "8px" }}>
         <h1 style={{ fontSize: "18px", fontWeight: "bold", letterSpacing: "0.5px", margin: "0 0 4px 0" }}>
           {data.fullName}
         </h1>
+
         <div style={{ fontSize: "11px", marginTop: "4px", letterSpacing: "0.5px" }}>
           {data.email && <span>{data.email}</span>}
-          {data.phone && <span> • </span>}
-          {data.phone && <span>{data.phone}</span>}
-          {data.location && <span> • </span>}
-          {data.location && <span>{data.location}</span>}
+          {data.phone && <span> • {data.phone}</span>}
+          {data.location && <span> • {data.location}</span>}
         </div>
       </div>
 
-      {/* Summary */}
+      {/* ================= SUMMARY ================= */}
       {data.summary && (
         <div style={{ marginBottom: "12px", textAlign: "justify", lineHeight: "1.6", color: "#333" }}>
           <p style={{ margin: "0", fontSize: "10px", whiteSpace: "pre-wrap" }}>{data.summary}</p>
         </div>
       )}
 
-      {/* Experience */}
+      {/* ================= EXPERIENCE ================= */}
       {data.experience.length > 0 && (
         <div style={{ marginBottom: "12px" }}>
           <h3
@@ -56,47 +55,45 @@ export default function AcademicTemplate({ data }: TemplateProps) {
           >
             Experience
           </h3>
-          <div style={{ lineHeight: "1.4" }}>
-            {data.experience.map((exp) => (
-              <div key={exp.id} style={{ marginBottom: "8px", fontSize: "10px" }}>
+
+          {data.experience.map((exp) => (
+            <div key={exp.id} style={{ marginBottom: "8px", fontSize: "10px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  marginBottom: "2px",
+                }}
+              >
+                <span style={{ fontWeight: "bold" }}>{exp.jobTitle}</span>
+
+                <span style={{ color: "#555", fontSize: "9px" }}>
+                  {exp.startDate}
+                  {exp.currentlyWorking ? " – Present" : exp.endDate ? ` – ${exp.endDate}` : ""}
+                </span>
+              </div>
+
+              <div style={{ color: "#555" }}>{exp.company}</div>
+
+              {exp.description && (
                 <div
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "baseline",
-                    marginBottom: "2px",
+                    whiteSpace: "pre-wrap",
+                    marginTop: "2px",
+                    textAlign: "justify",
+                    fontSize: "9px",
                   }}
                 >
-                  <span style={{ fontWeight: "bold" }}>{exp.jobTitle}</span>
-                  {exp.startDate && (
-                    <span style={{ color: "#555", fontSize: "9px" }}>
-                      {exp.startDate}
-                      {exp.endDate && !exp.currentlyWorking && ` – ${exp.endDate}`}
-                      {exp.currentlyWorking && " – Present"}
-                    </span>
-                  )}
+                  {exp.description}
                 </div>
-                <div style={{ color: "#555" }}>{exp.company}</div>
-                {exp.description && (
-                  <div
-                    style={{
-                      color: "#333",
-                      textAlign: "justify",
-                      margin: "2px 0 0 0",
-                      whiteSpace: "pre-wrap",
-                      fontSize: "9px",
-                    }}
-                  >
-                    {exp.description}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Education */}
+      {/* ================= EDUCATION (UPDATED) ================= */}
       {data.education.length > 0 && (
         <div style={{ marginBottom: "12px" }}>
           <h3
@@ -112,29 +109,52 @@ export default function AcademicTemplate({ data }: TemplateProps) {
           >
             Education
           </h3>
-          <div style={{ lineHeight: "1.4" }}>
-            {data.education.map((edu) => (
-              <div key={edu.id} style={{ marginBottom: "8px", fontSize: "10px" }}>
+
+          {data.education.map((edu) => (
+            <div key={edu.id} style={{ marginBottom: "8px", fontSize: "10px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                }}
+              >
+                <span style={{ fontWeight: "bold" }}>{edu.degree}</span>
+
+                <span style={{ color: "#555", fontSize: "9px" }}>
+                  {edu.startDate}
+                  {edu.endDate ? ` – ${edu.endDate}` : ""}
+                </span>
+              </div>
+
+              <div style={{ color: "#555" }}>{edu.school}</div>
+
+              {edu.field && <div style={{ color: "#333", fontSize: "9px" }}>{edu.field}</div>}
+
+              {edu.cgpa && (
+                <div style={{ color: "#444", fontSize: "9px", marginTop: "2px" }}>
+                  <strong>CGPA:</strong> {edu.cgpa}
+                </div>
+              )}
+
+              {edu.description && (
                 <div
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "baseline",
-                    marginBottom: "2px",
+                    color: "#333",
+                    fontSize: "9px",
+                    whiteSpace: "pre-wrap",
+                    marginTop: "3px",
                   }}
                 >
-                  <span style={{ fontWeight: "bold" }}>{edu.degree}</span>
-                  {edu.graduationDate && <span style={{ color: "#555", fontSize: "9px" }}>{edu.graduationDate}</span>}
+                  {edu.description}
                 </div>
-                <div style={{ color: "#555" }}>{edu.school}</div>
-                {edu.field && <div style={{ color: "#333", fontSize: "9px" }}>{edu.field}</div>}
-              </div>
-            ))}
-          </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Skills */}
+      {/* ================= SKILLS ================= */}
       {data.skills.length > 0 && (
         <div style={{ marginBottom: "12px" }}>
           <h3
@@ -150,7 +170,8 @@ export default function AcademicTemplate({ data }: TemplateProps) {
           >
             Skills
           </h3>
-          <div style={{ textAlign: "justify", fontSize: "10px" }}>
+
+          <div style={{ fontSize: "10px" }}>
             {data.skills.map((skill, idx) => (
               <span key={skill.id}>
                 {skill.name}
@@ -161,7 +182,7 @@ export default function AcademicTemplate({ data }: TemplateProps) {
         </div>
       )}
 
-      {/* Custom Fields */}
+      {/* ================= CUSTOM FIELDS ================= */}
       {data.customFields.map(
         (field) =>
           field.heading && (
@@ -179,11 +200,19 @@ export default function AcademicTemplate({ data }: TemplateProps) {
               >
                 {field.heading}
               </h3>
-              <div style={{ textAlign: "justify", color: "#333", fontSize: "10px", whiteSpace: "pre-wrap" }}>
+
+              <div
+                style={{
+                  fontSize: "10px",
+                  color: "#333",
+                  whiteSpace: "pre-wrap",
+                  textAlign: "justify",
+                }}
+              >
                 {field.content}
               </div>
             </div>
-          ),
+          )
       )}
     </div>
   )

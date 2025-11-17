@@ -64,19 +64,22 @@ export default function ResumeDraftForm({ data, onChange }: ResumeDraftFormProps
 
   // Education handlers
   const addEducation = () => {
-    const newEducation: Education = {
-      id: Date.now().toString(),
-      school: "",
-      degree: "",
-      field: "",
-      graduationDate: "",
-      description: "",
-    }
-    onChange({
-      ...data,
-      education: [...data.education, newEducation],
-    })
+  const newEducation: Education = {
+    id: Date.now().toString(),
+    school: "",
+    degree: "",
+    field: "",
+    startDate: "",
+    endDate: "",
+    cgpa: "",
+    description: "",
   }
+  onChange({
+    ...data,
+    education: [...data.education, newEducation],
+  })
+}
+
 
   const updateEducation = (id: string, field: keyof Education, value: string) => {
     onChange({
@@ -267,60 +270,78 @@ export default function ResumeDraftForm({ data, onChange }: ResumeDraftFormProps
       </Card>
 
       {/* Education */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Education</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {data.education.map((edu) => (
-            <div key={edu.id} className="border border-border rounded-md p-4 space-y-3">
-              <div className="flex justify-between items-start">
-                <Input
-                  placeholder="School/University"
-                  value={edu.school}
-                  onChange={(e) => updateEducation(edu.id, "school", e.target.value)}
-                  className="font-semibold"
-                />
-                <Button variant="ghost" size="sm" onClick={() => removeEducation(edu.id)}>
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  placeholder="Degree"
-                  value={edu.degree}
-                  onChange={(e) => updateEducation(edu.id, "degree", e.target.value)}
-                />
-                <Input
-                  placeholder="Field of Study"
-                  value={edu.field}
-                  onChange={(e) => updateEducation(edu.id, "field", e.target.value)}
-                />
-              </div>
-
-              <Input
-                placeholder="Graduation Date"
-                type="month"
-                value={edu.graduationDate}
-                onChange={(e) => updateEducation(edu.id, "graduationDate", e.target.value)}
-              />
-
-              <Textarea
-                placeholder="Additional details"
-                value={edu.description}
-                onChange={(e) => updateEducation(edu.id, "description", e.target.value)}
-                className="min-h-16"
-              />
-            </div>
-          ))}
-
-          <Button variant="outline" className="w-full bg-transparent" onClick={addEducation}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Education
+      {/* Education */}
+<Card>
+  <CardHeader>
+    <CardTitle className="text-lg">Education</CardTitle>
+  </CardHeader>
+  <CardContent className="space-y-4">
+    {data.education.map((edu) => (
+      <div key={edu.id} className="border border-border rounded-md p-4 space-y-3">
+        <div className="flex justify-between items-start">
+          <Input
+            placeholder="School/University"
+            value={edu.school}
+            onChange={(e) => updateEducation(edu.id, "school", e.target.value)}
+            className="font-semibold"
+          />
+          <Button variant="ghost" size="sm" onClick={() => removeEducation(edu.id)}>
+            <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Input
+            placeholder="Degree"
+            value={edu.degree}
+            onChange={(e) => updateEducation(edu.id, "degree", e.target.value)}
+          />
+          <Input
+            placeholder="Field of Study"
+            value={edu.field}
+            onChange={(e) => updateEducation(edu.id, "field", e.target.value)}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Input
+            placeholder="Start Date"
+            type="month"
+            value={edu.startDate}
+            onChange={(e) => updateEducation(edu.id, "startDate", e.target.value)}
+          />
+          <Input
+            placeholder="End Date"
+            type="month"
+            value={edu.endDate}
+            onChange={(e) => updateEducation(edu.id, "endDate", e.target.value)}
+          />
+        </div>
+
+        
+
+        <Input
+          placeholder="CGPA / Percentage"
+          value={edu.cgpa}
+          onChange={(e) => updateEducation(edu.id, "cgpa", e.target.value)}
+        />
+
+        <Textarea
+          placeholder="Additional details"
+          value={edu.description}
+          onChange={(e) => updateEducation(edu.id, "description", e.target.value)}
+          className="min-h-16"
+        />
+      </div>
+    ))}
+
+    <Button variant="outline" className="w-full bg-transparent" onClick={addEducation}>
+      <Plus className="h-4 w-4 mr-2" />
+      Add Education
+    </Button>
+  </CardContent>
+</Card>
+
 
       {/* Skills */}
       <Card>

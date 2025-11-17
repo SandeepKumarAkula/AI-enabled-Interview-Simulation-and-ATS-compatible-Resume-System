@@ -27,11 +27,24 @@ export default function ClassicTemplate({ data }: ClassicTemplateProps) {
     >
       {/* Header */}
       <div
-        style={{ textAlign: "center", borderBottom: "2px solid #000000", paddingBottom: "16px", marginBottom: "24px" }}
+        style={{
+          textAlign: "center",
+          borderBottom: "2px solid #000000",
+          paddingBottom: "16px",
+          marginBottom: "24px",
+        }}
       >
-        <h1 style={{ fontSize: "24px", fontWeight: "bold", letterSpacing: "0.5px", margin: "0 0 8px 0" }}>
+        <h1
+          style={{
+            fontSize: "24px",
+            fontWeight: "bold",
+            letterSpacing: "0.5px",
+            margin: "0 0 8px 0",
+          }}
+        >
           {data.fullName || "Your Name"}
         </h1>
+
         <div
           style={{
             display: "flex",
@@ -50,7 +63,7 @@ export default function ClassicTemplate({ data }: ClassicTemplateProps) {
         </div>
       </div>
 
-      {/* Professional Summary */}
+      {/* Summary */}
       {data.summary && (
         <div style={{ marginBottom: "20px" }}>
           <h2
@@ -66,7 +79,15 @@ export default function ClassicTemplate({ data }: ClassicTemplateProps) {
           >
             Professional Summary
           </h2>
-          <p style={{ fontSize: "12px", lineHeight: "1.6", color: "#333", margin: "0", whiteSpace: "pre-wrap" }}>
+          <p
+            style={{
+              fontSize: "12px",
+              lineHeight: "1.6",
+              color: "#333",
+              margin: "0",
+              whiteSpace: "pre-wrap",
+            }}
+          >
             {data.summary}
           </p>
         </div>
@@ -88,44 +109,46 @@ export default function ClassicTemplate({ data }: ClassicTemplateProps) {
           >
             Experience
           </h2>
-          <div>
-            {data.experience.map((exp) => (
-              <div key={exp.id} style={{ fontSize: "12px", marginBottom: "12px" }}>
-                <div
+
+          {data.experience.map((exp) => (
+            <div key={exp.id} style={{ fontSize: "12px", marginBottom: "12px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  marginBottom: "2px",
+                }}
+              >
+                <span style={{ fontWeight: "bold" }}>{exp.jobTitle}</span>
+
+                <span style={{ color: "#555" }}>
+                  {formatDate(exp.startDate)} –{" "}
+                  {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
+                </span>
+              </div>
+
+              <div style={{ color: "#555", fontStyle: "italic" }}>{exp.company}</div>
+              {exp.location && <div style={{ color: "#666", fontSize: "11px" }}>{exp.location}</div>}
+
+              {exp.description && (
+                <p
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "baseline",
-                    marginBottom: "2px",
+                    marginTop: "4px",
+                    color: "#333",
+                    whiteSpace: "pre-wrap",
+                    fontSize: "11px",
                   }}
                 >
-                  <span style={{ fontWeight: "bold" }}>{exp.jobTitle}</span>
-                  <span style={{ color: "#555" }}>
-                    {formatDate(exp.startDate)} – {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
-                  </span>
-                </div>
-                <div style={{ color: "#555", fontStyle: "italic" }}>{exp.company}</div>
-                {exp.location && <div style={{ color: "#666", fontSize: "11px" }}>{exp.location}</div>}
-                {exp.description && (
-                  <p
-                    style={{
-                      marginTop: "4px",
-                      color: "#333",
-                      whiteSpace: "pre-wrap",
-                      margin: "4px 0 0 0",
-                      fontSize: "11px",
-                    }}
-                  >
-                    {exp.description}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
+                  {exp.description}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Education */}
+      {/* Education (UPDATED) */}
       {data.education.length > 0 && (
         <div style={{ marginBottom: "20px" }}>
           <h2
@@ -141,31 +164,52 @@ export default function ClassicTemplate({ data }: ClassicTemplateProps) {
           >
             Education
           </h2>
-          <div>
-            {data.education.map((edu) => (
-              <div key={edu.id} style={{ fontSize: "12px", marginBottom: "8px" }}>
-                <div
+
+          {data.education.map((edu) => (
+            <div key={edu.id} style={{ fontSize: "12px", marginBottom: "12px" }}>
+              {/* School + Dates */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                }}
+              >
+                <span style={{ fontWeight: "bold" }}>{edu.school}</span>
+
+                <span style={{ color: "#555", fontSize: "11px" }}>
+                  {formatDate(edu.startDate)} –{" "}
+                  {edu.endDate ? formatDate(edu.endDate) : "Present"}
+                </span>
+              </div>
+
+              {/* Degree & Field */}
+              <div style={{ color: "#555" }}>
+                {edu.degree} {edu.field && `in ${edu.field}`}
+              </div>
+
+              {/* CGPA */}
+              {edu.cgpa && (
+                <div style={{ marginTop: "2px", color: "#444", fontSize: "11px" }}>
+                  <strong>CGPA:</strong> {edu.cgpa}
+                </div>
+              )}
+
+              {/* Description */}
+              {edu.description && (
+                <p
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "baseline",
-                    marginBottom: "2px",
+                    marginTop: "4px",
+                    color: "#333",
+                    whiteSpace: "pre-wrap",
+                    fontSize: "11px",
                   }}
                 >
-                  <span style={{ fontWeight: "bold" }}>{edu.school}</span>
-                  <span style={{ color: "#555", fontSize: "11px" }}>{formatDate(edu.graduationDate)}</span>
-                </div>
-                <div style={{ color: "#555" }}>
-                  {edu.degree} {edu.field && `in ${edu.field}`}
-                </div>
-                {edu.description && (
-                  <p style={{ marginTop: "4px", color: "#333", margin: "4px 0 0 0", fontSize: "11px" }}>
-                    {edu.description}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
+                  {edu.description}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
@@ -185,7 +229,10 @@ export default function ClassicTemplate({ data }: ClassicTemplateProps) {
           >
             Skills
           </h2>
-          <p style={{ fontSize: "12px", color: "#333", margin: "0" }}>{data.skills.map((s) => s.name).join(" • ")}</p>
+
+          <p style={{ fontSize: "12px", color: "#333", margin: "0" }}>
+            {data.skills.map((s) => s.name).join(" • ")}
+          </p>
         </div>
       )}
 
@@ -205,7 +252,8 @@ export default function ClassicTemplate({ data }: ClassicTemplateProps) {
           >
             {field.heading}
           </h2>
-          <p style={{ fontSize: "12px", color: "#333", margin: "0", whiteSpace: "pre-wrap" }}>{field.content}</p>
+
+          <p style={{ fontSize: "12px", whiteSpace: "pre-wrap", margin: "0" }}>{field.content}</p>
         </div>
       ))}
     </div>

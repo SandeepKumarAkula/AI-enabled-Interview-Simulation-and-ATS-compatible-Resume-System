@@ -39,7 +39,7 @@ export default function ModernTemplate({ data }: ModernTemplateProps) {
         </div>
       </div>
 
-      {/* Professional Summary */}
+      {/* Summary */}
       {data.summary && (
         <div style={{ marginBottom: "20px", paddingBottom: "16px", borderBottom: "1px solid #d1d5db" }}>
           <h2
@@ -53,7 +53,7 @@ export default function ModernTemplate({ data }: ModernTemplateProps) {
           >
             About
           </h2>
-          <p style={{ fontSize: "12px", color: "#374151", lineHeight: "1.6", margin: "0", whiteSpace: "pre-wrap" }}>
+          <p style={{ fontSize: "12px", color: "#374151", lineHeight: "1.6", margin: 0, whiteSpace: "pre-wrap" }}>
             {data.summary}
           </p>
         </div>
@@ -73,33 +73,36 @@ export default function ModernTemplate({ data }: ModernTemplateProps) {
           >
             Experience
           </h2>
-          <div>
-            {data.experience.map((exp) => (
-              <div key={exp.id} style={{ fontSize: "12px", marginBottom: "12px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <div style={{ fontWeight: "bold", color: "#111827" }}>{exp.jobTitle}</div>
-                    <div style={{ color: "#2563eb", fontWeight: "600" }}>{exp.company}</div>
-                  </div>
-                  <div style={{ color: "#4b5563", textAlign: "right" }}>
-                    <div>
-                      {formatDate(exp.startDate)} – {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
-                    </div>
-                    {exp.location && <div>{exp.location}</div>}
-                  </div>
+
+          {data.experience.map((exp) => (
+            <div key={exp.id} style={{ fontSize: "12px", marginBottom: "12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <div style={{ fontWeight: "bold", color: "#111827" }}>{exp.jobTitle}</div>
+                  <div style={{ color: "#2563eb", fontWeight: "600" }}>{exp.company}</div>
                 </div>
-                {exp.description && (
-                  <p style={{ marginTop: "4px", color: "#374151", whiteSpace: "pre-wrap", margin: "4px 0 0 0" }}>
-                    {exp.description}
-                  </p>
-                )}
+
+                <div style={{ color: "#4b5563", textAlign: "right" }}>
+                  <div>
+                    {formatDate(exp.startDate)} –{" "}
+                    {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
+                  </div>
+
+                  {exp.location && <div>{exp.location}</div>}
+                </div>
               </div>
-            ))}
-          </div>
+
+              {exp.description && (
+                <p style={{ marginTop: "4px", color: "#374151", whiteSpace: "pre-wrap", margin: "4px 0 0 0" }}>
+                  {exp.description}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Education */}
+      {/* Education (UPDATED) */}
       {data.education.length > 0 && (
         <div style={{ marginBottom: "20px", paddingBottom: "16px", borderBottom: "1px solid #d1d5db" }}>
           <h2
@@ -113,24 +116,37 @@ export default function ModernTemplate({ data }: ModernTemplateProps) {
           >
             Education
           </h2>
-          <div>
-            {data.education.map((edu) => (
-              <div key={edu.id} style={{ fontSize: "12px", marginBottom: "8px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <div style={{ fontWeight: "bold", color: "#111827" }}>{edu.school}</div>
-                    <div style={{ color: "#374151" }}>
-                      {edu.degree} {edu.field && `in ${edu.field}`}
-                    </div>
+
+          {data.education.map((edu) => (
+            <div key={edu.id} style={{ fontSize: "12px", marginBottom: "8px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <div style={{ fontWeight: "bold", color: "#111827" }}>{edu.school}</div>
+                  <div style={{ color: "#374151" }}>
+                    {edu.degree} {edu.field && `in ${edu.field}`}
                   </div>
-                  <div style={{ color: "#4b5563" }}>{formatDate(edu.graduationDate)}</div>
+
+                  {/* CGPA */}
+                  {edu.cgpa && (
+                    <div style={{ color: "#1e3a8a", fontSize: "11px", marginTop: "4px" }}>
+                      <strong>CGPA:</strong> {edu.cgpa}
+                    </div>
+                  )}
                 </div>
-                {edu.description && (
-                  <p style={{ marginTop: "4px", color: "#374151", margin: "4px 0 0 0" }}>{edu.description}</p>
-                )}
+
+                <div style={{ color: "#4b5563" }}>
+                  {formatDate(edu.startDate)} –{" "}
+                  {edu.endDate ? formatDate(edu.endDate) : "Present"}
+                </div>
               </div>
-            ))}
-          </div>
+
+              {edu.description && (
+                <p style={{ marginTop: "4px", color: "#374151", whiteSpace: "pre-wrap" }}>
+                  {edu.description}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
@@ -148,6 +164,7 @@ export default function ModernTemplate({ data }: ModernTemplateProps) {
           >
             Skills
           </h2>
+
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
             {data.skills.map((skill) => (
               <span
@@ -182,7 +199,10 @@ export default function ModernTemplate({ data }: ModernTemplateProps) {
           >
             {field.heading}
           </h2>
-          <p style={{ fontSize: "12px", color: "#374151", margin: "0", whiteSpace: "pre-wrap" }}>{field.content}</p>
+
+          <p style={{ fontSize: "12px", color: "#374151", margin: 0, whiteSpace: "pre-wrap" }}>
+            {field.content}
+          </p>
         </div>
       ))}
     </div>

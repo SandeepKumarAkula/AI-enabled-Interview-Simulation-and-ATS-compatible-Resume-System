@@ -30,6 +30,7 @@ export default function MinimalTemplate({ data }: MinimalTemplateProps) {
         <h1 style={{ fontSize: "18px", fontWeight: "300", letterSpacing: "0.5px", margin: "0 0 8px 0" }}>
           {data.fullName || "Your Name"}
         </h1>
+
         <div style={{ display: "flex", gap: "8px", fontSize: "12px", color: "#4b5563", marginTop: "4px" }}>
           {data.email && <span>{data.email}</span>}
           {data.phone && <span>—</span>}
@@ -39,12 +40,10 @@ export default function MinimalTemplate({ data }: MinimalTemplateProps) {
         </div>
       </div>
 
-      {/* Professional Summary */}
+      {/* Summary */}
       {data.summary && (
         <div style={{ marginTop: "20px" }}>
-          <p style={{ fontSize: "12px", color: "#374151", lineHeight: "1.6", margin: "0", whiteSpace: "pre-wrap" }}>
-            {data.summary}
-          </p>
+          <p style={{ fontSize: "12px", color: "#374151", whiteSpace: "pre-wrap" }}>{data.summary}</p>
         </div>
       )}
 
@@ -63,32 +62,35 @@ export default function MinimalTemplate({ data }: MinimalTemplateProps) {
           >
             Experience
           </div>
-          <div>
-            {data.experience.map((exp) => (
-              <div key={exp.id} style={{ fontSize: "12px", marginBottom: "12px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
-                  <span style={{ fontWeight: "600" }}>
-                    {exp.jobTitle} at {exp.company}
-                  </span>
-                  <span style={{ color: "#666", fontSize: "11px" }}>
-                    {formatDate(exp.startDate)} – {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
-                  </span>
-                </div>
-                {exp.location && (
-                  <div style={{ color: "#666", fontSize: "11px", marginBottom: "4px" }}>{exp.location}</div>
-                )}
-                {exp.description && (
-                  <p style={{ color: "#374151", margin: "4px 0 0 0", fontSize: "11px", whiteSpace: "pre-wrap" }}>
-                    {exp.description}
-                  </p>
-                )}
+
+          {data.experience.map((exp) => (
+            <div key={exp.id} style={{ fontSize: "12px", marginBottom: "12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
+                <span style={{ fontWeight: "600" }}>
+                  {exp.jobTitle} at {exp.company}
+                </span>
+
+                <span style={{ color: "#666", fontSize: "11px" }}>
+                  {formatDate(exp.startDate)} –{" "}
+                  {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
+                </span>
               </div>
-            ))}
-          </div>
+
+              {exp.location && (
+                <div style={{ color: "#666", fontSize: "11px", marginBottom: "4px" }}>{exp.location}</div>
+              )}
+
+              {exp.description && (
+                <p style={{ color: "#374151", fontSize: "11px", whiteSpace: "pre-wrap", marginTop: "4px" }}>
+                  {exp.description}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Education */}
+      {/* Education (UPDATED) */}
       {data.education.length > 0 && (
         <div style={{ marginTop: "20px" }}>
           <div
@@ -103,21 +105,35 @@ export default function MinimalTemplate({ data }: MinimalTemplateProps) {
           >
             Education
           </div>
-          <div>
-            {data.education.map((edu) => (
-              <div key={edu.id} style={{ fontSize: "12px", marginBottom: "8px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
-                  <span style={{ fontWeight: "600" }}>
-                    {edu.degree} in {edu.field} from {edu.school}
-                  </span>
-                  <span style={{ color: "#666", fontSize: "11px" }}>{formatDate(edu.graduationDate)}</span>
-                </div>
-                {edu.description && (
-                  <p style={{ color: "#374151", margin: "4px 0 0 0", fontSize: "11px" }}>{edu.description}</p>
-                )}
+
+          {data.education.map((edu) => (
+            <div key={edu.id} style={{ fontSize: "12px", marginBottom: "8px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
+                <span style={{ fontWeight: "600" }}>
+                  {edu.degree} in {edu.field} — {edu.school}
+                </span>
+
+                <span style={{ color: "#666", fontSize: "11px" }}>
+                  {formatDate(edu.startDate)} –{" "}
+                  {edu.endDate ? formatDate(edu.endDate) : "Present"}
+                </span>
               </div>
-            ))}
-          </div>
+
+              {/* CGPA */}
+              {edu.cgpa && (
+                <div style={{ color: "#374151", fontSize: "11px" }}>
+                  <strong>CGPA:</strong> {edu.cgpa}
+                </div>
+              )}
+
+              {/* Description */}
+              {edu.description && (
+                <p style={{ color: "#374151", fontSize: "11px", whiteSpace: "pre-wrap", marginTop: "4px" }}>
+                  {edu.description}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
@@ -136,13 +152,14 @@ export default function MinimalTemplate({ data }: MinimalTemplateProps) {
           >
             Skills
           </div>
+
           <p style={{ fontSize: "12px", color: "#374151", margin: "0" }}>
             {data.skills.map((s) => s.name).join(" • ")}
           </p>
         </div>
       )}
 
-      {/* Custom Fields */}
+      {/* Custom Sections */}
       {data.customFields.map((field) => (
         <div key={field.id} style={{ marginTop: "20px" }}>
           <div
@@ -157,7 +174,10 @@ export default function MinimalTemplate({ data }: MinimalTemplateProps) {
           >
             {field.heading}
           </div>
-          <p style={{ fontSize: "12px", color: "#374151", margin: "0", whiteSpace: "pre-wrap" }}>{field.content}</p>
+
+          <p style={{ fontSize: "12px", color: "#374151", whiteSpace: "pre-wrap", margin: "0" }}>
+            {field.content}
+          </p>
         </div>
       ))}
     </div>

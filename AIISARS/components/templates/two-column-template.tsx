@@ -26,20 +26,24 @@ export default function TwoColumnTemplate({ data }: TwoColumnTemplateProps) {
         minHeight: "100vh",
       }}
     >
-      {/* Left Column - Sidebar */}
+      {/* LEFT SIDEBAR */}
       <div
         style={{ backgroundColor: "#1f2937", color: "#ffffff", width: "33.33%", padding: "24px", overflowY: "auto" }}
       >
+        {/* Name + Contact */}
         <div style={{ marginBottom: "24px" }}>
-          <h1 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 8px 0" }}>{data.fullName || "Your Name"}</h1>
-          <div style={{ color: "#d1d5db", fontSize: "11px", space: "1px", marginTop: "8px" }}>
-            {data.email && <div style={{ marginBottom: "2px" }}>📧 {data.email}</div>}
-            {data.phone && <div style={{ marginBottom: "2px" }}>📞 {data.phone}</div>}
-            {data.location && <div style={{ marginBottom: "2px" }}>📍 {data.location}</div>}
+          <h1 style={{ fontSize: "18px", fontWeight: "bold", margin: "0 0 8px 0" }}>
+            {data.fullName || "Your Name"}
+          </h1>
+
+          <div style={{ color: "#d1d5db", fontSize: "11px", marginTop: "8px" }}>
+            {data.email && <div>📧 {data.email}</div>}
+            {data.phone && <div>📞 {data.phone}</div>}
+            {data.location && <div>📍 {data.location}</div>}
           </div>
         </div>
 
-        {/* Skills in sidebar */}
+        {/* Skills */}
         {data.skills.length > 0 && (
           <div style={{ marginBottom: "24px" }}>
             <h2
@@ -54,18 +58,17 @@ export default function TwoColumnTemplate({ data }: TwoColumnTemplateProps) {
             >
               Skills
             </h2>
-            <div>
-              {data.skills.map((skill) => (
-                <div key={skill.id} style={{ fontSize: "11px", color: "#d1d5db", marginBottom: "4px" }}>
-                  <span style={{ fontWeight: "600" }}>{skill.name}</span>
-                  <span style={{ color: "#999", fontSize: "10px" }}> - {skill.level}</span>
-                </div>
-              ))}
-            </div>
+
+            {data.skills.map((skill) => (
+              <div key={skill.id} style={{ marginBottom: "4px", color: "#d1d5db" }}>
+                <span style={{ fontWeight: "600" }}>{skill.name}</span>
+                <span style={{ color: "#999", fontSize: "10px" }}> — {skill.level}</span>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Summary in sidebar */}
+        {/* Sidebar Summary */}
         {data.summary && (
           <div>
             <h2
@@ -80,13 +83,14 @@ export default function TwoColumnTemplate({ data }: TwoColumnTemplateProps) {
             >
               About
             </h2>
-            <p style={{ fontSize: "11px", color: "#b0b8c1", lineHeight: "1.6", margin: "0" }}>{data.summary}</p>
+
+            <p style={{ fontSize: "11px", color: "#b0b8c1", lineHeight: "1.6", margin: 0 }}>{data.summary}</p>
           </div>
         )}
       </div>
 
-      {/* Right Column - Main Content */}
-      <div style={{ flex: "1", padding: "24px", overflowY: "auto" }}>
+      {/* RIGHT MAIN CONTENT */}
+      <div style={{ flex: 1, padding: "24px", overflowY: "auto" }}>
         {/* Experience */}
         {data.experience.length > 0 && (
           <div style={{ marginBottom: "20px" }}>
@@ -95,7 +99,6 @@ export default function TwoColumnTemplate({ data }: TwoColumnTemplateProps) {
                 fontSize: "11px",
                 fontWeight: "bold",
                 textTransform: "uppercase",
-                letterSpacing: "0.5px",
                 marginBottom: "12px",
                 borderBottom: "2px solid #e5e7eb",
                 paddingBottom: "4px",
@@ -103,29 +106,32 @@ export default function TwoColumnTemplate({ data }: TwoColumnTemplateProps) {
             >
               Experience
             </h2>
-            <div>
-              {data.experience.map((exp) => (
-                <div key={exp.id} style={{ fontSize: "11px", marginBottom: "12px" }}>
-                  <div style={{ fontWeight: "bold", color: "#1a1a1a", marginBottom: "2px" }}>{exp.jobTitle}</div>
-                  <div style={{ color: "#374151", fontWeight: "600", marginBottom: "2px" }}>{exp.company}</div>
-                  <div style={{ color: "#666", fontSize: "10px", marginBottom: "2px" }}>
-                    {formatDate(exp.startDate)} – {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
-                  </div>
-                  {exp.location && (
-                    <div style={{ color: "#666", fontSize: "10px", marginBottom: "4px" }}>{exp.location}</div>
-                  )}
-                  {exp.description && (
-                    <p style={{ color: "#374151", margin: "4px 0 0 0", fontSize: "10px", whiteSpace: "pre-wrap" }}>
-                      {exp.description}
-                    </p>
-                  )}
+
+            {data.experience.map((exp) => (
+              <div key={exp.id} style={{ marginBottom: "12px" }}>
+                <div style={{ fontWeight: "bold" }}>{exp.jobTitle}</div>
+
+                <div style={{ fontWeight: "600", color: "#374151" }}>{exp.company}</div>
+
+                <div style={{ color: "#666", fontSize: "10px" }}>
+                  {formatDate(exp.startDate)} – {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
                 </div>
-              ))}
-            </div>
+
+                {exp.location && (
+                  <div style={{ color: "#666", fontSize: "10px" }}>{exp.location}</div>
+                )}
+
+                {exp.description && (
+                  <p style={{ color: "#374151", marginTop: "4px", whiteSpace: "pre-wrap", fontSize: "10px" }}>
+                    {exp.description}
+                  </p>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Education */}
+        {/* Education (UPDATED) */}
         {data.education.length > 0 && (
           <div>
             <h2
@@ -133,7 +139,6 @@ export default function TwoColumnTemplate({ data }: TwoColumnTemplateProps) {
                 fontSize: "11px",
                 fontWeight: "bold",
                 textTransform: "uppercase",
-                letterSpacing: "0.5px",
                 marginBottom: "12px",
                 borderBottom: "2px solid #e5e7eb",
                 paddingBottom: "4px",
@@ -141,32 +146,44 @@ export default function TwoColumnTemplate({ data }: TwoColumnTemplateProps) {
             >
               Education
             </h2>
-            <div>
-              {data.education.map((edu) => (
-                <div key={edu.id} style={{ fontSize: "11px", marginBottom: "12px" }}>
-                  <div style={{ fontWeight: "bold", color: "#1a1a1a", marginBottom: "2px" }}>{edu.school}</div>
-                  <div style={{ color: "#374151", marginBottom: "2px" }}>
-                    {edu.degree} in {edu.field}
-                  </div>
-                  <div style={{ color: "#666", fontSize: "10px" }}>{formatDate(edu.graduationDate)}</div>
-                  {edu.description && (
-                    <p style={{ color: "#374151", margin: "4px 0 0 0", fontSize: "10px" }}>{edu.description}</p>
-                  )}
+
+            {data.education.map((edu) => (
+              <div key={edu.id} style={{ marginBottom: "12px" }}>
+                <div style={{ fontWeight: "bold", marginBottom: "2px" }}>{edu.school}</div>
+
+                <div style={{ color: "#374151", marginBottom: "2px" }}>
+                  {edu.degree} {edu.field && `in ${edu.field}`}
                 </div>
-              ))}
-            </div>
+
+                <div style={{ color: "#666", fontSize: "10px" }}>
+                  {formatDate(edu.startDate)} – {edu.endDate ? formatDate(edu.endDate) : "Present"}
+                </div>
+
+                {/* CGPA */}
+                {edu.cgpa && (
+                  <div style={{ marginTop: "2px", fontSize: "10px", color: "#1e3a8a" }}>
+                    <strong>CGPA:</strong> {edu.cgpa}
+                  </div>
+                )}
+
+                {edu.description && (
+                  <p style={{ fontSize: "10px", color: "#374151", marginTop: "4px" }}>
+                    {edu.description}
+                  </p>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Custom Fields */}
+        {/* Custom Sections */}
         {data.customFields.map((field) => (
-          <div key={field.id} style={{ marginBottom: "20px" }}>
+          <div key={field.id} style={{ marginTop: "20px" }}>
             <h2
               style={{
                 fontSize: "11px",
                 fontWeight: "bold",
                 textTransform: "uppercase",
-                letterSpacing: "0.5px",
                 marginBottom: "12px",
                 borderBottom: "2px solid #e5e7eb",
                 paddingBottom: "4px",
@@ -174,7 +191,10 @@ export default function TwoColumnTemplate({ data }: TwoColumnTemplateProps) {
             >
               {field.heading}
             </h2>
-            <p style={{ fontSize: "11px", color: "#374151", margin: "0", whiteSpace: "pre-wrap" }}>{field.content}</p>
+
+            <p style={{ fontSize: "11px", color: "#374151", margin: 0, whiteSpace: "pre-wrap" }}>
+              {field.content}
+            </p>
           </div>
         ))}
       </div>

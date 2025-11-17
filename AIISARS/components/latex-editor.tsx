@@ -46,7 +46,6 @@ export default function LatexEditor({ data, onChange }: LatexEditorProps) {
             Edit the LaTeX code. Click <b>Compile LaTeX</b> to apply changes to the form and preview.
           </p>
 
-          {/* TEXTAREA */}
           <Textarea
             value={pendingLatex}
             onChange={(e) => setPendingLatex(e.target.value)}
@@ -54,7 +53,6 @@ export default function LatexEditor({ data, onChange }: LatexEditorProps) {
             placeholder="% LaTeX resume code here..."
           />
 
-          {/* COMPILE BUTTON */}
           <button
             onClick={handleCompileLatex}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -68,9 +66,9 @@ export default function LatexEditor({ data, onChange }: LatexEditorProps) {
               <li><code>\name{"{fullName}"}</code>, <code>\email{"{email}"}</code>, <code>\phone{"{phone}"}</code></li>
               <li><code>\summary{"{summary}"}</code></li>
               <li><code>\experience{"{jobTitle}{company}{location}{start}{end}{desc}"}</code></li>
-              <li><code>\education{"{school}{degree}{field}{date}{desc}"}</code></li>
+              <li><code>\education{"{school}{degree}{field}{start-end}{cgpa}{desc}"}</code></li>
               <li><code>\skill{"{name}{level}"}</code></li>
-              <li><code>\section{"{heading}{content}{content2}{content3}..."}</code></li>
+              <li><code>\section{"{heading}{content1}{content2}..."}</code></li>
             </ul>
           </div>
         </CardContent>
@@ -78,8 +76,6 @@ export default function LatexEditor({ data, onChange }: LatexEditorProps) {
     </div>
   )
 }
-
-
 
 /* -------------------- LATEX GENERATOR -------------------- */
 
@@ -104,7 +100,7 @@ function generateLatexFromData(data: ResumeData): string {
   if (data.education.length > 0) {
     latex += "\n%% Education\n"
     data.education.forEach((edu) => {
-      latex += `\\education{${escapeLatex(edu.school)}}{${escapeLatex(edu.degree)}}{${escapeLatex(edu.field)}}{${escapeLatex(edu.graduationDate)}}{${escapeLatex(edu.description)}}\n`
+      latex += `\\education{${escapeLatex(edu.school)}}{${escapeLatex(edu.degree)}}{${escapeLatex(edu.field)}}{${escapeLatex(edu.startDate)} - ${escapeLatex(edu.endDate)}}{${escapeLatex(edu.cgpa)}}{${escapeLatex(edu.description)}}\n`
     })
   }
 
@@ -125,14 +121,11 @@ function generateLatexFromData(data: ResumeData): string {
   return latex
 }
 
-
-
-/* -------------------- LATEX PARSER (OPTION B ENABLED) -------------------- */
+/* -------------------- LATEX PARSER -------------------- */
 
 function parseLatexToData(latex: string, currentData: ResumeData): ResumeData {
   const newData = { ...currentData }
 
-  // Basic fields
   const nameMatch = latex.match(/\\name\s*\{([^}]*)\}/)
   if (nameMatch) newData.fullName = unescapeLatex(nameMatch[1].trim())
 
@@ -148,11 +141,11 @@ function parseLatexToData(latex: string, currentData: ResumeData): ResumeData {
   const summaryMatch = latex.match(/\\summary\s*\{([\s\S]*?)\}(?=\\|$)/)
   if (summaryMatch) newData.summary = unescapeLatex(summaryMatch[1].trim())
 
-  /* ---------- EXPERIENCES ---------- */
+  /* EXPERIENCE */
   const experienceMatches = [...latex.matchAll(/\\experience\s*\{([^}]*)\}\{([^}]*)\}\{([^}]*)\}\{([^}]*)\}\{([\s\S]*?)\}/g)]
   newData.experience = experienceMatches.map((match) => {
     const [, jobTitle, company, location, dates, description] = match
-    const [startDate, endDateRaw] = dates.split(" - ")
+    const [startDate, endDateRaw] = dates.split(" - ").map(s => s.trim())
     const endDate = endDateRaw === "Present" ? "" : endDateRaw
 
     return {
@@ -160,28 +153,35 @@ function parseLatexToData(latex: string, currentData: ResumeData): ResumeData {
       jobTitle: unescapeLatex(jobTitle),
       company: unescapeLatex(company),
       location: unescapeLatex(location),
-      startDate: unescapeLatex(startDate || ""),
-      endDate: unescapeLatex(endDate || ""),
+      startDate: unescapeLatex(startDate),
+      endDate: unescapeLatex(endDate),
       currentlyWorking: endDateRaw === "Present",
       description: unescapeLatex(description),
     }
   })
 
-  /* ---------- EDUCATION ---------- */
-  const educationMatches = [...latex.matchAll(/\\education\s*\{([^}]*)\}\{([^}]*)\}\{([^}]*)\}\{([^}]*)\}\{([\s\S]*?)\}/g)]
+  /* EDUCATION — UPDATED */
+  const educationMatches = [...latex.matchAll(
+    /\\education\s*\{([^}]*)\}\{([^}]*)\}\{([^}]*)\}\{([^}]*)\}\{([^}]*)\}\{([\s\S]*?)\}/g
+  )]
+
   newData.education = educationMatches.map((match) => {
-    const [, school, degree, field, date, description] = match
+    const [, school, degree, field, dates, cgpa, description] = match
+    const [startDate, endDate] = dates.split("-").map(s => s.trim())
+
     return {
       id: Date.now().toString() + Math.random(),
       school: unescapeLatex(school),
       degree: unescapeLatex(degree),
       field: unescapeLatex(field),
-      graduationDate: unescapeLatex(date),
+      startDate: unescapeLatex(startDate),
+      endDate: unescapeLatex(endDate),
+      cgpa: unescapeLatex(cgpa),
       description: unescapeLatex(description),
     }
   })
 
-  /* ---------- SKILLS ---------- */
+  /* SKILLS */
   const skillMatches = [...latex.matchAll(/\\skill\s*\{([^}]*)\}\{([^}]*)\}/g)]
   newData.skills = skillMatches.map((match) => {
     const [, name, level] = match
@@ -192,16 +192,14 @@ function parseLatexToData(latex: string, currentData: ResumeData): ResumeData {
     }
   })
 
-  /* ---------- CUSTOM SECTIONS (OPTION B: ANY # OF ARGUMENTS) ---------- */
+  /* CUSTOM SECTIONS */
   const sectionPattern = /\\section\s*\{([^}]*)\}((?:\s*\{[^}]*\})*)/g
   const sectionMatches = [...latex.matchAll(sectionPattern)]
 
   newData.customFields = sectionMatches.map((match) => {
     const heading = unescapeLatex(match[1])
-
-    const contentBlock = match[2] // "{a}{b}{c}{d}..."
+    const contentBlock = match[2]
     const contentMatches = [...contentBlock.matchAll(/\{([^}]*)\}/g)]
-
     const contentLines = contentMatches.map(m => unescapeLatex(m[1].trim()))
 
     return {
@@ -214,9 +212,7 @@ function parseLatexToData(latex: string, currentData: ResumeData): ResumeData {
   return newData
 }
 
-
-
-/* -------------------- LATEX ESCAPING -------------------- */
+/* -------------------- LATEX ESCAPERS -------------------- */
 
 function escapeLatex(text: string | undefined | null): string {
   if (!text) return ""
