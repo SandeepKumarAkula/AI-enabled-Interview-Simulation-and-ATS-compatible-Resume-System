@@ -1,0 +1,57 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# turbopack / turbo cache
+.turbo
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+
+# env files
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# testing/coverage
+coverage
+
+# dist outputs (when used)
+dist
+
+# editor/IDE
+.vscode/
+.idea/
+
+# linter caches
+.eslintcache
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Android
+android/build/
+android/app/build/
+android/.gradle/
+*.apk
+*.aab
+*.jks
+*.keystore

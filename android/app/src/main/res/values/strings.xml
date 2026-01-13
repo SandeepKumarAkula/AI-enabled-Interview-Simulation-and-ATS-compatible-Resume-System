@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AI SARS</string>
+    <string name="title_activity_main">AI SARS</string>
+    <string name="package_name">com.aisars.app</string>
+    <string name="custom_url_scheme">com.aisars.app</string>
+</resources>
