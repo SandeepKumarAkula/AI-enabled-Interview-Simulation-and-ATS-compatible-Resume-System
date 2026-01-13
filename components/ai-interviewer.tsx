@@ -1726,7 +1726,7 @@ export function AIInterviewer() {
                     value={interviewDuration}
                     onChange={e => setInterviewDuration(Number(e.target.value))}
                   >
-                    {[1, 5, 10, 15, 20, 30, 45, 60].map(min => (
+                    {[5, 10, 15, 20, 30, 45, 60].map(min => (
                       <option key={min} value={min}>{min} min</option>
                     ))}
                   </select>
