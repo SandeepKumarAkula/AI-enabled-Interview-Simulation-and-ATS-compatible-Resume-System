@@ -889,6 +889,15 @@ export function AIInterviewer() {
         // Only exit the interview room on manual end; keep it open to show the auto-end report
         setInterviewStarted(false)
       }
+      
+      // Exit fullscreen when interview ends
+      if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {})
+        } else if ((document as any).webkitExitFullscreen) {
+          (document as any).webkitExitFullscreen()
+        }
+      }
     } catch (err: any) {
       addToast(err.message || "Failed to generate report", "error")
     } finally {
