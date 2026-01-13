@@ -3,9 +3,9 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.aisars.app',
   appName: 'AI²SARS',
-  webDir: 'public',
+  webDir: 'out',
   android: {
-    icon: 'logo.png'
+    icon: 'public/logo.png'
   }
 };
 
