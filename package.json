@@ -62,7 +62,7 @@
     "jspdf": "latest",
     "lucide-react": "^0.454.0",
     "mammoth": "^1.11.0",
-    "next": "16.0.0",
+    "next": "^16.1.1",
     "next-themes": "latest",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.4.530",
