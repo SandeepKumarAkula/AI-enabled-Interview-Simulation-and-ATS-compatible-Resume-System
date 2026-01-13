@@ -50,7 +50,7 @@ jobs:
           ./gradlew assembleRelease --no-daemon
 
       - name: Sign APK (if keystore exists)
-        if: ${{ secrets.KEYSTORE_FILE != '' }}
+        if: ${{ secrets.KEYSTORE_FILE != null }}
         run: |
           echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > android/app/keystore.jks
           cd android
