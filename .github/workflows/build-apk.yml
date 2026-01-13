@@ -49,17 +49,6 @@ jobs:
           cd android
           ./gradlew assembleRelease --no-daemon
 
-      - name: Sign APK (if keystore exists)
-        if: ${{ secrets.KEYSTORE_FILE != null }}
-        run: |
-          echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > android/app/keystore.jks
-          cd android
-          ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=app/keystore.jks \
-            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
