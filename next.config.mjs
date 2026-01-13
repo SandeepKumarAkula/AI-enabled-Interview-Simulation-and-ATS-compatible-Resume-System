@@ -6,7 +6,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  output: 'export',
   // Disable Next.js dev overlay (the black N button and related UI)
   devIndicators: {
     buildActivityPosition: 'bottom-right',
