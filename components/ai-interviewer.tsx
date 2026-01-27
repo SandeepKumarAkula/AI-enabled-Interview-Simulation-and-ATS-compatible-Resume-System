@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/toast"
+import { downloadInterviewReportPdf } from "@/lib/interview-report-pdf"
 import {
   AlertCircle,
   BadgeCheck,
@@ -163,6 +164,7 @@ export function AIInterviewer() {
   const [aggregate, setAggregate] = useState<AggregateScores | null>(null)
   const [resumeInsights, setResumeInsights] = useState<ResumeInsights | undefined>(undefined)
   const [report, setReport] = useState<CombinedReport | null>(null)
+  const [completedInterviewId, setCompletedInterviewId] = useState<string | null>(null)
   const [transcript, setTranscript] = useState<LiveTranscriptEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [starting, setStarting] = useState(false)
@@ -175,6 +177,7 @@ export function AIInterviewer() {
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const autoEndTriggered = useRef(false)
+  const endingSessionRef = useRef(false)
   const [audioTestInProgress, setAudioTestInProgress] = useState(false)
   const [interviewStarted, setInterviewStarted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -197,12 +200,26 @@ export function AIInterviewer() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const previewVideoRef = useRef<HTMLVideoElement | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null) // Keep stream alive across transitions
+  const cameraRequestSeq = useRef(0)
   const [cameraOn, setCameraOn] = useState(false)
   const [videoSeconds, setVideoSeconds] = useState(0)
   const lastVideoStart = useRef<number | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
 
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const recordedChunksRef = useRef<BlobPart[]>([])
+  const recordingAudioRef = useRef<MediaStream | null>(null)
+  const [isRecordingVideo, setIsRecordingVideo] = useState(false)
+
   const currentRole = customRole.trim() || role
+
+  // Safety: stop camera/mic if the component unmounts (route change/refresh).
+  useEffect(() => {
+    return () => {
+      stopAllMedia()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null
@@ -732,6 +749,7 @@ export function AIInterviewer() {
       setQuestion(data.question)
       setResumeInsights(data.resumeInsights)
       setReport(null)
+      setCompletedInterviewId(null)
       setTranscript([])
       setAggregate(null)
       setInterviewStarted(true)
@@ -849,20 +867,42 @@ export function AIInterviewer() {
   }
 
   const endSession = async (isAutoEnd = false) => {
-    if (!sessionId) return
-    setLoading(true)
+    if (endingSessionRef.current) return
+    const currentSessionId = sessionId
+    if (!currentSessionId) return
+    endingSessionRef.current = true
+
+    // Manual end should feel instant: exit the interview UI immediately and do the
+    // backend cleanup/persistence in the background.
+    if (!isAutoEnd) {
+      stopAllMedia()
+      if (timerRef.current) clearInterval(timerRef.current)
+      setReport(null)
+      setQuestion(null)
+      setRemainingSeconds(null)
+      autoEndTriggered.current = false
+      setInterviewStarted(false)
+      setSessionId(null)
+      addToast("Ending interview…", "info")
+    } else {
+      setLoading(true)
+    }
+    let recordedBlob: Blob | null = null
     try {
       // Stop speech synthesis immediately
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel()
       }
 
+      // Stop recording as soon as session ends. For manual ends, we discard.
+      recordedBlob = await stopRecordingVideo(!isAutoEnd)
+
       const response = await fetch("/api/ai-interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "end-session",
-          sessionId,
+          sessionId: currentSessionId,
           mergeResumeReport: true,
         }),
       })
@@ -873,21 +913,50 @@ export function AIInterviewer() {
       }
 
       const data = await response.json()
-      // Only show report if interview ended automatically (time expired) or naturally
+      // Persist interview + report only when the interview completes (auto-end with report).
+      // We include `meta` with the AI session id to avoid duplicates on retries.
+      if (isAutoEnd && data?.report) {
+        try {
+          const saved = await fetch('/api/interviews', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: `${role} - ${new Date().toLocaleString()}`,
+              meta: JSON.stringify({ aiSessionId: currentSessionId }),
+              reportContent: data.report,
+            }),
+            credentials: 'include',
+          })
+
+          if (saved.ok) {
+            const json = await saved.json().catch(() => ({}))
+            const interviewId = json?.interview?.id as string | undefined
+            if (interviewId) {
+              setCompletedInterviewId(interviewId)
+              if (recordedBlob && recordedBlob.size > 0) {
+                uploadInterviewRecording(interviewId, recordedBlob).catch((e) => {
+                  console.error('Video upload failed:', e)
+                })
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Failed to save interview:', e)
+        }
+      }
+
       if (isAutoEnd) {
         setReport(data.report)
         addToast("Time expired - final evaluation ready", "success")
       } else {
-        setReport(null)  // Don't show report for manual end
-        addToast("Interview ended early - no analysis report", "info")
+        // Manual end: UI already exited above; just inform about persistence result.
+        addToast("Interview ended early (not saved)", "info")
       }
-      setQuestion(null)
-      setSessionId(null)
-      setRemainingSeconds(null)
-      autoEndTriggered.current = false
-      if (!isAutoEnd) {
-        // Only exit the interview room on manual end; keep it open to show the auto-end report
-        setInterviewStarted(false)
+      if (isAutoEnd) {
+        setQuestion(null)
+        setSessionId(null)
+        setRemainingSeconds(null)
+        autoEndTriggered.current = false
       }
       
       // Exit fullscreen when interview ends
@@ -901,380 +970,19 @@ export function AIInterviewer() {
     } catch (err: any) {
       addToast(err.message || "Failed to generate report", "error")
     } finally {
-      setLoading(false)
-      if (timerRef.current) clearInterval(timerRef.current!)
-      stopAllMedia()
+      if (isAutoEnd) {
+        setLoading(false)
+        if (timerRef.current) clearInterval(timerRef.current!)
+        stopAllMedia()
+      }
+      endingSessionRef.current = false
     }
   }
 
   const downloadReport = async () => {
     if (!report) return
     try {
-      const { jsPDF } = await import("jspdf")
-      const pdf = new jsPDF({ unit: "mm", format: "a4" })
-
-      const margin = 18
-      const pageWidth = 210
-      const pageHeight = 297
-      const contentWidth = pageWidth - 2 * margin
-      let y = 18
-
-      // MODERN HEADER WITH BRAND BADGE
-      pdf.setFillColor(46, 204, 113)
-      pdf.roundedRect(margin, y, 10, 10, 2, 2, "F")
-      pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(16)
-      pdf.setTextColor(255, 255, 255)
-      pdf.text("A", margin + 3, y + 7)
-
-      pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(18)
-      pdf.setTextColor(17, 24, 39)
-      pdf.text("AI²SARS", margin + 13, y + 7)
-
-      pdf.setFont("helvetica", "normal")
-      pdf.setFontSize(8)
-      pdf.setTextColor(107, 114, 128)
-      pdf.text("AI Interview Intelligence Report", margin + 13, y + 11)
-      
-      // Role and Experience on RIGHT side
-      pdf.setFont("helvetica", "normal")
-      pdf.setFontSize(8)
-      pdf.setTextColor(75, 85, 99)
-      pdf.text(`Role: ${report.interview?.role || "-"}`, pageWidth - 60, y + 3)
-      pdf.text(`Experience: ${report.interview?.experienceLevel || "-"}`, pageWidth - 60, y + 8)
-      pdf.text(new Date().toLocaleDateString(), pageWidth - 60, y + 13)
-
-      pdf.setFont("helvetica", "normal")
-      pdf.setFontSize(6)
-      pdf.setTextColor(107, 114, 128)
-      pdf.text("Note: Interview Score = Overall performance", pageWidth - 60, y + 17)
-      pdf.text("Role Match = Job fit percentage", pageWidth - 60, y + 20)
-
-      y += 18
-
-      // HERO SECTION with gradient-like effect
-      const readiness = report.interview?.interviewReadinessScore ?? 0
-      const suitability = report.interview?.roleSuitabilityScore ?? 0
-
-      pdf.setFillColor(240, 253, 244)
-      pdf.roundedRect(margin, y, contentWidth, 38, 3, 3, "F")
-      pdf.setDrawColor(191, 233, 210)
-      pdf.setLineWidth(0.5)
-      pdf.roundedRect(margin, y, contentWidth, 38, 3, 3, "S")
-
-      // Left side - main score
-      pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(8)
-      pdf.setTextColor(75, 85, 99)
-      pdf.text("OVERALL INTERVIEW PERFORMANCE", margin + 4, y + 6)
-
-      pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(38)
-      pdf.setTextColor(22, 163, 74)
-      pdf.text(String(readiness), margin + 4, y + 23)
-
-      pdf.setFont("helvetica", "normal")
-      pdf.setFontSize(12)
-      pdf.setTextColor(75, 85, 99)
-      pdf.text("/100", margin + 22, y + 20)
-
-      const readinessLabel = readiness >= 75 ? "Excellent Performance" : readiness >= 55 ? "Good Performance" : "Needs Improvement"
-      pdf.setFont("helvetica", "normal")
-      pdf.setFontSize(8)
-      pdf.setTextColor(75, 85, 99)
-      pdf.text(readinessLabel, margin + 4, y + 30)
-
-      // Right side - circular score visualization
-      const circleX = pageWidth - margin - 30
-      const circleY = y + 19
-      const circleRadius = 18
-
-      pdf.setFillColor(250, 255, 251)
-      pdf.circle(circleX, circleY, circleRadius, "F")
-      pdf.setDrawColor(22, 163, 74)
-      pdf.setLineWidth(1)
-      pdf.circle(circleX, circleY, circleRadius, "S")
-
-      pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(16)
-      pdf.setTextColor(22, 163, 74)
-      pdf.text(`${suitability}%`, circleX - 8, circleY + 2)
-
-      pdf.setFont("helvetica", "normal")
-      pdf.setFontSize(7)
-      pdf.setTextColor(75, 85, 99)
-      pdf.text("Job Fit %", circleX - 7, circleY + 7)
-
-      y += 44
-
-      // AI INTELLIGENCE INSIGHTS - Purple Gradient
-      pdf.setFillColor(198, 216, 255)
-      pdf.roundedRect(margin, y, contentWidth, 30, 3, 3, "F")
-      
-      // Add gradient effect manually with multiple rectangles
-      for (let i = 0; i < 10; i++) {
-        const alpha = i / 10
-        const r = 198 + (161 - 198) * alpha
-        const g = 216 + (140 - 216) * alpha
-        const b = 255
-        pdf.setFillColor(r, g, b)
-        pdf.rect(margin, y + i * 3, contentWidth, 3, "F")
-      }
-
-      pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(9)
-      pdf.setTextColor(255, 255, 255)
-      pdf.text("Pre-trained AI Intelligence Insights", margin + 4, y + 6)
-
-      const decision = suitability >= 70 || readiness >= 70 ? "HIRE" : "CONSIDER"
-      const decisionColor = decision === "HIRE" ? [34, 197, 94] : [234, 179, 8]
-      
-      pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(9)
-      pdf.setTextColor(255, 255, 255)
-      pdf.text(`Decision: ${decision}`, margin + 4, y + 12)
-
-      // RL Metrics Grid
-      pdf.setFont("helvetica", "normal")
-      pdf.setFontSize(7)
-      pdf.setTextColor(255, 255, 255)
-      pdf.text(`Confidence: ${readiness}%`, margin + 4, y + 18)
-      pdf.text(`Success Prediction: ${Math.round((readiness + suitability) / 2)}%`, margin + 4, y + 22)
-
-      const reasoning = (report.interview?.strengths || []).slice(0, 1).join("") || "Confident and professional demeanor"
-      const reasoningLines = pdf.splitTextToSize(`Reasoning: ${reasoning}`, contentWidth - 8)
-      pdf.setFontSize(7)
-      reasoningLines.slice(0, 2).forEach((line, idx) => {
-        pdf.text(line, margin + 4, y + 26 + idx * 3)
-      })
-
-      y += 34
-
-      // METRICS SECTION - Grid Layout
-      const dims = report.interview?.dimensionalScores || {}
-      const metrics = [
-        { label: "Technical", value: dims.technical || 0, color: [99, 102, 241] },
-        { label: "Problem-Solving", value: dims.problemSolving || 0, color: [99, 102, 241] },
-        { label: "Communication", value: dims.communication || 0, color: [99, 102, 241] },
-        { label: "Practical", value: dims.practical || 0, color: [99, 102, 241] },
-        { label: "Behavioral", value: dims.behavioral || 0, color: [99, 102, 241] },
-      ]
-
-      const metricWidth = (contentWidth - 8) / 3
-      const metricHeight = 20
-
-      metrics.forEach((metric, idx) => {
-        const col = idx % 3
-        const row = Math.floor(idx / 3)
-        const mx = margin + col * (metricWidth + 4)
-        const my = y + row * (metricHeight + 4)
-
-        pdf.setFillColor(238, 242, 255)
-        pdf.roundedRect(mx, my, metricWidth, metricHeight, 2, 2, "F")
-        pdf.setDrawColor(224, 231, 255)
-        pdf.setLineWidth(0.3)
-        pdf.roundedRect(mx, my, metricWidth, metricHeight, 2, 2, "S")
-
-        pdf.setFont("helvetica", "bold")
-        pdf.setFontSize(7)
-        pdf.setTextColor(67, 56, 202)
-        pdf.text(metric.label, mx + 3, my + 5)
-
-        // Number and "/100" with proper spacing
-        const numValue = String(metric.value)
-        
-        pdf.setFont("helvetica", "bold")
-        pdf.setFontSize(14)
-        pdf.setTextColor(49, 46, 129)
-        pdf.text(numValue, mx + 3, my + 14)
-
-        // Get actual width of number to position /100 correctly
-        pdf.setFont("helvetica", "bold")
-        pdf.setFontSize(14)
-        const numWidth = pdf.getTextWidth(numValue)
-        
-        pdf.setFont("helvetica", "normal")
-        pdf.setFontSize(8)
-        pdf.setTextColor(67, 56, 202)
-        pdf.text("/ 100", mx + 3 + numWidth + 2, my + 14)
-      })
-
-      y += Math.ceil(metrics.length / 3) * (metricHeight + 4) + 6
-
-      // TWO COLUMN LAYOUT - Strengths & Improvements
-      const leftColX = margin
-      const rightColX = margin + contentWidth / 2 + 2
-      const colWidth = contentWidth / 2 - 2
-      
-      if (y > pageHeight - 60) {
-        pdf.addPage()
-        y = margin
-      }
-
-      // Left - Strengths
-      pdf.setFillColor(248, 250, 252)
-      pdf.roundedRect(leftColX, y, colWidth, 50, 2, 2, "F")
-      pdf.setDrawColor(226, 232, 240)
-      pdf.setLineWidth(0.3)
-      pdf.roundedRect(leftColX, y, colWidth, 50, 2, 2, "S")
-
-      pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(8)
-      pdf.setTextColor(34, 197, 94)
-      pdf.text("Profile - Strengths", leftColX + 3, y + 5)
-
-      const strengths = report.interview?.strengths || []
-      let leftY = y + 10
-
-      strengths.slice(0, 5).forEach(strength => {
-        const cleanStrength = strength.replace(/[^\x20-\x7E]/g, '')
-        const lines = pdf.splitTextToSize(`- ${cleanStrength}`, colWidth - 6)
-        pdf.setFont("helvetica", "normal")
-        pdf.setFontSize(7)
-        pdf.setTextColor(31, 41, 55)
-        lines.slice(0, 2).forEach(line => {
-          if (leftY < y + 48) {
-            pdf.text(line, leftColX + 3, leftY)
-            leftY += 3
-          }
-        })
-      })
-
-      // Right - Improvements
-      pdf.setFillColor(248, 250, 252)
-      pdf.roundedRect(rightColX, y, colWidth, 50, 2, 2, "F")
-      pdf.setDrawColor(226, 232, 240)
-      pdf.setLineWidth(0.3)
-      pdf.roundedRect(rightColX, y, colWidth, 50, 2, 2, "S")
-
-      pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(8)
-      pdf.setTextColor(234, 88, 12)
-      pdf.text("Profile - Improvements", rightColX + 3, y + 5)
-
-      const improvements = report.interview?.improvements || []
-      let rightY = y + 10
-
-      improvements.slice(0, 5).forEach(improvement => {
-        const cleanImprovement = improvement.replace(/[^\x20-\x7E]/g, '')
-        const lines = pdf.splitTextToSize(`- ${cleanImprovement}`, colWidth - 6)
-        pdf.setFont("helvetica", "normal")
-        pdf.setFontSize(7)
-        pdf.setTextColor(31, 41, 55)
-        lines.slice(0, 2).forEach(line => {
-          if (rightY < y + 48) {
-            pdf.text(line, rightColX + 3, rightY)
-            rightY += 3
-          }
-        })
-      })
-
-      y += 54
-
-      // TOPICS COVERED
-      if (y > pageHeight - 30) {
-        pdf.addPage()
-        y = margin
-      }
-
-      pdf.setFillColor(248, 250, 252)
-      pdf.roundedRect(margin, y, contentWidth, 15, 2, 2, "F")
-      pdf.setDrawColor(226, 232, 240)
-      pdf.setLineWidth(0.2)
-      pdf.roundedRect(margin, y, contentWidth, 15, 2, 2, "S")
-
-      pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(8)
-      pdf.setTextColor(15, 23, 42)
-      pdf.text("Topics Covered", margin + 3, y + 5)
-
-      const topics = (report.interview?.askedTopics || []).length > 0 
-        ? (report.interview?.askedTopics || []).join(", ")
-        : "Not captured"
-      const topicLines = pdf.splitTextToSize(topics, contentWidth - 6)
-      pdf.setFont("helvetica", "normal")
-      pdf.setFontSize(7)
-      pdf.setTextColor(75, 85, 99)
-      let topicY = y + 9
-      topicLines.slice(0, 2).forEach(line => {
-        pdf.text(line, margin + 3, topicY)
-        topicY += 3
-      })
-
-      y += 19
-
-      // TRANSCRIPT HIGHLIGHTS
-      if (y > pageHeight - 50) {
-        pdf.addPage()
-        y = margin
-      }
-
-      pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(9)
-      pdf.setTextColor(15, 23, 42)
-      pdf.text("Transcript Highlights", margin, y)
-      y += 6
-
-      const transcript = report.interview?.transcript || []
-      transcript.forEach((entry, idx) => {
-        if (y > pageHeight - 40) {
-          pdf.addPage()
-          y = margin + 5
-        }
-
-        // Question box
-        const qText = `Q${idx + 1}: ${entry.question}`
-        const qLines = pdf.splitTextToSize(qText, contentWidth - 8)
-        const qBoxHeight = Math.min(qLines.length * 3.5 + 4, 18)
-        
-        pdf.setFillColor(224, 242, 254)
-        pdf.roundedRect(margin, y, contentWidth, qBoxHeight, 2, 2, "F")
-        pdf.setDrawColor(186, 230, 253)
-        pdf.setLineWidth(0.4)
-        pdf.roundedRect(margin, y, contentWidth, qBoxHeight, 2, 2, "S")
-
-        pdf.setFont("helvetica", "bold")
-        pdf.setFontSize(7)
-        pdf.setTextColor(14, 165, 233)
-        let qY = y + 4
-        qLines.slice(0, 3).forEach(line => {
-          pdf.text(line, margin + 3, qY)
-          qY += 3.5
-        })
-
-        y += qBoxHeight + 5
-
-        // Answer
-        pdf.setFont("helvetica", "normal")
-        pdf.setFontSize(7)
-        pdf.setTextColor(31, 41, 55)
-        const cleanAnswer = entry.answer.replace(/[^\x20-\x7E\n]/g, '')
-        const ansLines = pdf.splitTextToSize(cleanAnswer, contentWidth - 6)
-        ansLines.slice(0, 6).forEach(line => {
-          if (y > pageHeight - 12) {
-            pdf.addPage()
-            y = margin + 5
-          }
-          pdf.text(line, margin + 3, y)
-          y += 3
-        })
-        y += 6
-      })
-
-      // FOOTER
-      if (y > pageHeight - 15) {
-        pdf.addPage()
-        y = margin
-      }
-      
-      y = pageHeight - 10
-      pdf.setFont("helvetica", "normal")
-      pdf.setFontSize(7)
-      pdf.setTextColor(107, 114, 128)
-      pdf.text("AI²SARS • AI Interview Intelligence Report", pageWidth / 2, y, { align: "center" })
-
-      pdf.save(`ai-interview-report-${Date.now()}.pdf`)
+      await downloadInterviewReportPdf(report)
       addToast("PDF Report Downloaded", "success")
     } catch (err: any) {
       console.error("PDF export failed", err)
@@ -1284,6 +992,7 @@ export function AIInterviewer() {
 
   const startCamera = async () => {
     try {
+      const requestId = ++cameraRequestSeq.current
       console.log("Starting camera...")
       
       // Check if we already have an active stream from setup
@@ -1307,6 +1016,12 @@ export function AIInterviewer() {
         audio: false 
       })
       console.log("Fresh camera stream obtained:", stream)
+
+      // If the user stopped/ended while getUserMedia was in-flight, don't re-enable the camera.
+      if (requestId !== cameraRequestSeq.current) {
+        stream.getTracks().forEach(track => track.stop())
+        return
+      }
       
       // Save stream in persistent ref
       mediaStreamRef.current = stream
@@ -1338,12 +1053,195 @@ export function AIInterviewer() {
     }
   }
 
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = (videoRef.current.srcObject as MediaStream).getTracks()
-      tracks.forEach(track => track.stop())
-      videoRef.current.srcObject = null
+  const pickSupportedRecorderMimeType = () => {
+    const types = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8',
+      'video/webm',
+    ]
+    if (typeof window === 'undefined' || typeof (window as any).MediaRecorder === 'undefined') return null
+    const MR = (window as any).MediaRecorder as typeof MediaRecorder
+    for (const t of types) {
+      try {
+        if (MR.isTypeSupported(t)) return t
+      } catch {
+        // ignore
+      }
     }
+    return null
+  }
+
+  const startRecordingVideo = async () => {
+    if (recorderRef.current || isRecordingVideo) return
+    if (!mediaStreamRef.current) return
+    if (typeof window === 'undefined' || typeof (window as any).MediaRecorder === 'undefined') {
+      addToast('Video recording is not supported in this browser', 'error')
+      return
+    }
+
+    try {
+      recordedChunksRef.current = []
+
+      // Combine existing camera video track with a microphone audio track (best-effort).
+      const videoTracks = mediaStreamRef.current.getVideoTracks()
+      let audioTracks: MediaStreamTrack[] = []
+      try {
+        const audioStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: false,
+        })
+        recordingAudioRef.current = audioStream
+        audioTracks = audioStream.getAudioTracks()
+      } catch {
+        // If mic capture fails, continue with video-only.
+        recordingAudioRef.current = null
+      }
+
+      const stream = new MediaStream([...videoTracks, ...audioTracks])
+      const mimeType = pickSupportedRecorderMimeType()
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+
+      recorder.ondataavailable = (e: BlobEvent) => {
+        if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data)
+      }
+
+      recorder.onerror = (e) => {
+        console.error('MediaRecorder error:', e)
+      }
+
+      recorderRef.current = recorder
+      setIsRecordingVideo(true)
+      // Emit chunks periodically to avoid huge single buffer.
+      recorder.start(1000)
+    } catch (e: any) {
+      console.error('Failed to start recording:', e)
+      setIsRecordingVideo(false)
+      recorderRef.current = null
+      addToast(e?.message || 'Failed to start video recording', 'error')
+    }
+  }
+
+  const stopRecordingVideo = async (discard: boolean): Promise<Blob | null> => {
+    const recorder = recorderRef.current
+    if (!recorder) {
+      // Ensure we stop any separately acquired audio stream.
+      if (recordingAudioRef.current) {
+        recordingAudioRef.current.getTracks().forEach(t => t.stop())
+        recordingAudioRef.current = null
+      }
+      setIsRecordingVideo(false)
+      return null
+    }
+
+    return await new Promise<Blob | null>((resolve) => {
+      const finalize = () => {
+        recorderRef.current = null
+        setIsRecordingVideo(false)
+        if (recordingAudioRef.current) {
+          recordingAudioRef.current.getTracks().forEach(t => t.stop())
+          recordingAudioRef.current = null
+        }
+
+        if (discard) {
+          recordedChunksRef.current = []
+          resolve(null)
+          return
+        }
+
+        const parts = recordedChunksRef.current
+        recordedChunksRef.current = []
+        if (!parts.length) {
+          resolve(null)
+          return
+        }
+        const blobType = (recorder as any).mimeType || 'video/webm'
+        resolve(new Blob(parts, { type: blobType }))
+      }
+
+      try {
+        recorder.onstop = finalize
+        recorder.stop()
+      } catch {
+        finalize()
+      }
+    })
+  }
+
+  const uploadInterviewRecording = async (interviewId: string, blob: Blob) => {
+    try {
+      addToast('Uploading interview recording…', 'info')
+
+      const ext = (blob.type && blob.type.includes('webm')) ? 'webm' : 'webm'
+      const presign = await fetch('/api/uploads/presign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: `interview-${interviewId}.${ext}`,
+          contentType: blob.type || 'video/webm',
+          type: 'videos',
+        }),
+        credentials: 'include',
+      })
+
+      if (!presign.ok) {
+        const json = await presign.json().catch(() => ({}))
+        throw new Error(json?.error || 'Video storage is not configured')
+      }
+
+      const { uploadUrl, key } = await presign.json()
+      const put = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': blob.type || 'video/webm' },
+        body: blob,
+      })
+      if (!put.ok) {
+        throw new Error('Failed to upload recording')
+      }
+
+      const attach = await fetch('/api/interviews/attach-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interviewId, key }),
+        credentials: 'include',
+      })
+      if (!attach.ok) {
+        const json = await attach.json().catch(() => ({}))
+        throw new Error(json?.error || 'Failed to attach recording')
+      }
+
+      addToast('Interview recording saved', 'success')
+    } catch (e: any) {
+      addToast(e?.message || 'Recording upload failed', 'error')
+      throw e
+    }
+  }
+
+  useEffect(() => {
+    // Start recording when the interview actually begins.
+    if (interviewStarted) {
+      startRecordingVideo()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interviewStarted])
+
+  const stopCamera = () => {
+    // Invalidate any pending getUserMedia() request so it can't reattach after stopping.
+    cameraRequestSeq.current++
+
+    // Stop any tracks attached to either video element.
+    const maybeStopVideoEl = (el: HTMLVideoElement | null) => {
+      if (!el || !el.srcObject) return
+      const tracks = (el.srcObject as MediaStream).getTracks()
+      tracks.forEach(track => track.stop())
+      el.pause()
+      el.srcObject = null
+    }
+
+    maybeStopVideoEl(videoRef.current)
+    maybeStopVideoEl(previewVideoRef.current)
+
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => track.stop())
       mediaStreamRef.current = null
@@ -1551,6 +1449,8 @@ export function AIInterviewer() {
 
   const stopAllMedia = () => {
     stopListening()
+    // Best-effort stop recording; discard the blob.
+    stopRecordingVideo(true).catch(() => null)
     stopCamera()
   }
 
@@ -1735,7 +1635,7 @@ export function AIInterviewer() {
                     value={interviewDuration}
                     onChange={e => setInterviewDuration(Number(e.target.value))}
                   >
-                    {[5, 10, 15, 20, 30, 45, 60].map(min => (
+                    {[1, 5, 10, 15, 20, 30, 45, 60].map(min => (
                       <option key={min} value={min}>{min} min</option>
                     ))}
                   </select>
@@ -2128,9 +2028,11 @@ export function AIInterviewer() {
               <Button
                 onClick={() => {
                   setReport(null)
+                  stopAllMedia()
                   setInterviewStarted(false)
                   setSessionId(null)
                   setQuestion(null)
+                    setCompletedInterviewId(null)
                   setTranscript([])
                   setAggregate(null)
                 }}
@@ -2138,6 +2040,13 @@ export function AIInterviewer() {
               >
                 New Interview
               </Button>
+                {completedInterviewId && (
+                  <a href={`/dashboard/interviews/${completedInterviewId}`}>
+                    <Button variant="outline" className="flex-1 text-sm">
+                      View in My Interviews
+                    </Button>
+                  </a>
+                )}
             </CardFooter>
           </Card>
         </div>

@@ -1,14 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import TemplateGallery from "@/components/template-gallery"
 import ResumeBuilder from "@/components/resume-builder"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
+import { fetchWithAuth } from "@/lib/clientAuth"
 
 export default function Home() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  useEffect(() => {
+    fetchWithAuth('/api/resumes').then(r => setIsLoggedIn(r.ok)).catch(() => setIsLoggedIn(false))
+  }, [])
 
   const FeatureCard = ({
     title,

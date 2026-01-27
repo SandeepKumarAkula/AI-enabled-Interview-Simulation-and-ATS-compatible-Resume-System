@@ -2,90 +2,163 @@
 
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import ResumeDraftForm from "@/components/resume-draft-form"
 import ResumePreview from "@/components/resume-preview"
 import LatexEditor from "@/components/latex-editor"
-import { ChevronLeft, Download, Loader2, FileJson, Code } from "lucide-react"
+import { ChevronLeft, Download, Loader2, FileJson, Code, Save } from "lucide-react"
 import type { ResumeData } from "@/lib/types"
 import { cleanHtmlForPDF } from "@/lib/style-converter"
 import { DEFAULT_RESUME_DATA } from "@/lib/default-resume-data"
+import { fetchWithAuth } from "@/lib/clientAuth"
+import { useToast } from "@/components/toast"
 
 interface ResumeBuilderProps {
   template: string
   onBack: () => void
+  resumeId?: string
+  initialResumeData?: ResumeData
 }
 
-export default function ResumeBuilder({ template, onBack }: ResumeBuilderProps) {
+export default function ResumeBuilder({ template, onBack, resumeId, initialResumeData }: ResumeBuilderProps) {
   const previewRef = useRef<HTMLDivElement>(null)
+  const { addToast } = useToast()
   const [isExporting, setIsExporting] = useState(false)
-  const [resumeData, setResumeData] = useState<ResumeData>(DEFAULT_RESUME_DATA)
+  const [isSaving, setIsSaving] = useState(false)
+  const [savedResumeId, setSavedResumeId] = useState<string | null>(resumeId || null)
+  const [resumeData, setResumeData] = useState<ResumeData>(initialResumeData || DEFAULT_RESUME_DATA)
   const [editorMode, setEditorMode] = useState<"form" | "latex">("form")
+  const [versionLabel, setVersionLabel] = useState<string>("")
+
+  const generatePdfBlob = async (): Promise<Blob> => {
+    if (!previewRef.current) throw new Error("Preview not ready")
+
+    const html2canvas = (await import("html2canvas")).default
+    const jsPDF = (await import("jspdf")).jsPDF
+
+    const cleanElement = cleanHtmlForPDF(previewRef.current)
+    const tempContainer = document.createElement("div")
+    tempContainer.style.position = "fixed"
+    tempContainer.style.left = "-9999px"
+    tempContainer.style.top = "-9999px"
+    tempContainer.style.width = "800px"
+    tempContainer.appendChild(cleanElement)
+    document.body.appendChild(tempContainer)
+
+    try {
+      const canvas = await html2canvas(cleanElement, {
+        useCORS: true,
+        logging: false,
+        scale: 2,
+        backgroundColor: "#ffffff",
+        allowTaint: true,
+        imageTimeout: 0,
+      })
+
+      const imgData = canvas.toDataURL("image/png")
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      })
+
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = pdf.internal.pageSize.getHeight()
+      const imgWidth = pdfWidth - 10
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      let heightLeft = imgHeight
+      let position = 5
+
+      pdf.addImage(imgData, "PNG", 5, position, imgWidth, imgHeight)
+      heightLeft -= pdfHeight - 10
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(imgData, "PNG", 5, position, imgWidth, imgHeight)
+        heightLeft -= pdfHeight - 10
+      }
+
+      return pdf.output("blob") as Blob
+    } finally {
+      document.body.removeChild(tempContainer)
+    }
+  }
+
+  const handleSaveToDashboard = async () => {
+    setIsSaving(true)
+    try {
+      if (!resumeData.fullName) throw new Error("Please enter your name before saving")
+
+      const title = `${resumeData.fullName} - ${template}`
+      const effectiveLabel = versionLabel?.trim() || (savedResumeId ? "Update" : "Initial")
+      const data = JSON.stringify({ template, resumeData, versionLabel: effectiveLabel })
+
+      // DB-only save (no upload). Template resumes are stored as JSON in resume history.
+      if (savedResumeId) {
+        // Keep the parent resume title up-to-date for edited resumes.
+        try {
+          await fetchWithAuth(`/api/resumes/${savedResumeId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title }),
+          })
+        } catch {
+          // Non-blocking: version save is the critical path.
+        }
+
+        const res = await fetchWithAuth(`/api/resumes/${savedResumeId}/versions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(json.error || "Failed to save a new version")
+        setVersionLabel("")
+        addToast("Saved as a new resume version", "success")
+      } else {
+        const res = await fetchWithAuth("/api/resumes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, data }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(json.error || "Failed to save")
+        if (json.resumeId) setSavedResumeId(json.resumeId)
+        setVersionLabel("")
+        addToast("Saved to your resume history", "success")
+      }
+    } catch (e: any) {
+      addToast(e?.message || "Failed to save", "error")
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const handleDownloadPDF = async () => {
     if (!resumeData.fullName) {
-      alert("Please enter your name before downloading")
+      addToast("Please enter your name before downloading", "error")
       return
     }
 
     setIsExporting(true)
     try {
-      if (previewRef.current) {
-        const html2canvas = (await import("html2canvas")).default
-        const jsPDF = (await import("jspdf")).jsPDF
-
-        const cleanElement = cleanHtmlForPDF(previewRef.current)
-
-        const tempContainer = document.createElement("div")
-        tempContainer.style.position = "fixed"
-        tempContainer.style.left = "-9999px"
-        tempContainer.style.top = "-9999px"
-        tempContainer.style.width = "800px"
-        tempContainer.appendChild(cleanElement)
-        document.body.appendChild(tempContainer)
-
-        try {
-          const canvas = await html2canvas(cleanElement, {
-            useCORS: true,
-            logging: false,
-            scale: 2,
-            backgroundColor: "#ffffff",
-            allowTaint: true,
-            imageTimeout: 0,
-          })
-
-          const imgData = canvas.toDataURL("image/png")
-          const pdf = new jsPDF({
-            orientation: "portrait",
-            unit: "mm",
-            format: "a4",
-          })
-
-          const pdfWidth = pdf.internal.pageSize.getWidth()
-          const pdfHeight = pdf.internal.pageSize.getHeight()
-          const imgWidth = pdfWidth - 10
-          const imgHeight = (canvas.height * imgWidth) / canvas.width
-
-          let heightLeft = imgHeight
-          let position = 5
-
-          pdf.addImage(imgData, "PNG", 5, position, imgWidth, imgHeight)
-          heightLeft -= pdfHeight - 10
-
-          while (heightLeft > 0) {
-            position = heightLeft - imgHeight
-            pdf.addPage()
-            pdf.addImage(imgData, "PNG", 5, position, imgWidth, imgHeight)
-            heightLeft -= pdfHeight - 10
-          }
-
-          pdf.save(`${resumeData.fullName}-Resume.pdf`)
-        } finally {
-          document.body.removeChild(tempContainer)
-        }
+      const blob = await generatePdfBlob()
+      const url = URL.createObjectURL(blob)
+      try {
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `${resumeData.fullName}-Resume.pdf`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+      } finally {
+        URL.revokeObjectURL(url)
       }
     } catch (error) {
       console.error("Error generating PDF:", error)
-      alert("Failed to generate PDF. Please try again.")
+      addToast("Failed to generate PDF. Please try again.", "error")
     } finally {
       setIsExporting(false)
     }
@@ -126,6 +199,34 @@ export default function ResumeBuilder({ template, onBack }: ResumeBuilderProps) 
                 <Code className="h-4 w-4" />
                 LaTeX
               </button>
+            </div>
+
+            <Button
+              onClick={handleSaveToDashboard}
+              disabled={isSaving}
+              variant="outline"
+              className="font-medium"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <span className="hidden sm:inline">Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Save</span>
+                </>
+              )}
+            </Button>
+
+            <div className="w-full sm:w-[220px]">
+              <Input
+                value={versionLabel}
+                onChange={(e) => setVersionLabel(e.target.value)}
+                placeholder="Version name (optional)"
+                className="h-9"
+              />
             </div>
 
             <Button

@@ -7,6 +7,7 @@ import Header from "@/components/header"
 import Footer from "@/components/footer"
 import { ToastProvider } from "@/components/toast"
 import { LoadingProvider } from "@/components/global-loading-provider"
+import { ConfirmProvider } from "@/components/confirm"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -28,12 +29,14 @@ export default function RootLayout({
     <html lang="en">
       <body className={`font-sans antialiased`}>
         <ToastProvider>
-          <LoadingProvider>
-            <Header />
-            {children}
-            <Footer />
-            <Analytics />
-          </LoadingProvider>
+          <ConfirmProvider>
+            <LoadingProvider>
+              <Header />
+              {children}
+              <Footer />
+              <Analytics />
+            </LoadingProvider>
+          </ConfirmProvider>
         </ToastProvider>
       </body>
     </html>

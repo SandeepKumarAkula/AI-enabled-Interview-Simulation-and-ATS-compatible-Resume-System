@@ -3,6 +3,7 @@ import { HfInference } from "@huggingface/inference"
 import { validateResumeStructure, getResumeValidationScore } from "@/lib/resume-validator"
 import { customATSAgent } from "@/lib/custom-ats-agent"
 import { rlATSAgent, type ResumFeatures } from "@/lib/rl-ats-agent"
+import { getUserFromToken } from "@/lib/auth"
 
 // Initialize Hugging Face client with free API
 const hf = new HfInference(process.env.HUGGINGFACE_API_TOKEN || "")
@@ -666,6 +667,11 @@ const analyzeSpecificIssues = (text: string): {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getUserFromToken(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     // Check if Hugging Face API token is configured
     if (!process.env.HUGGINGFACE_API_TOKEN) {
       console.warn("⚠️ HUGGINGFACE_API_TOKEN not configured - using fallback analysis")

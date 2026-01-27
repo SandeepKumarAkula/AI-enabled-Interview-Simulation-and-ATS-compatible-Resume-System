@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import { AlertCircle, CheckCircle, TrendingUp, Brain, Zap, RefreshCw, Download, Upload } from "lucide-react"
 import { useToast } from "@/components/toast"
+import { useConfirm } from "@/components/confirm"
 
 interface AgentState {
   version: string
@@ -35,6 +36,7 @@ interface PatternInsight {
 
 export function ATSTrainingDashboard() {
   const { addToast } = useToast()
+  const confirm = useConfirm()
   const [agentState, setAgentState] = useState<AgentState | null>(null)
   const [patterns, setPatterns] = useState<PatternInsight[]>([])
   const [loading, setLoading] = useState(false)
@@ -119,9 +121,14 @@ export function ATSTrainingDashboard() {
   }
 
   const handleReset = async () => {
-    if (!confirm("Are you sure you want to reset the agent to factory defaults? This cannot be undone.")) {
-      return
-    }
+    const ok = await confirm({
+      title: 'Reset ATS agent?',
+      description: 'This will reset the agent to factory defaults. This cannot be undone.',
+      confirmText: 'Reset',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    })
+    if (!ok) return
 
     try {
       const response = await fetch("/api/train-agent", {

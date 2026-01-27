@@ -2,12 +2,14 @@
 
 import { useState, useRef } from 'react';
 import { type ResumFeatures } from '@/lib/rl-ats-agent';
+import { useToast } from '@/components/toast';
 
 function Card({ className = '', children }: any) {
   return <div className={`rounded-xl border border-gray-200 bg-white shadow-sm ${className}`}>{children}</div>;
 }
 
 export function AIAgentPanel() {
+  const { addToast } = useToast();
   const [features, setFeatures] = useState<ResumFeatures>({
     technicalScore: 75,
     experienceYears: 5,
@@ -74,9 +76,10 @@ export function AIAgentPanel() {
       setInsights(data.insights);
       setTrainMode(false);
       setFeedback(null);
-      alert('✅ Agent learned from outcome! Improving...');
+      addToast('Agent learned from outcome! Improving...', 'success');
     } catch (error) {
       console.error('Error training agent:', error);
+      addToast('Failed to train agent', 'error');
     } finally {
       setLoading(false);
     }
