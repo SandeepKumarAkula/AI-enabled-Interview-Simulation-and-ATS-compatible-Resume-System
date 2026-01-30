@@ -37,7 +37,8 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
       if (reloadCount < 2) {
         window.localStorage.setItem('reloadCount', String(reloadCount + 1))
         console.debug('protected-route: reloading page to ensure session hydration')
-        window.location.reload()
+        // Use location.replace to avoid adding extra history entries
+        window.location.replace(window.location.href)
       } else {
         window.localStorage.removeItem('reloadCount')
       }

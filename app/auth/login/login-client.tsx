@@ -87,9 +87,16 @@ export default function LoginClient() {
           }
 
           // Auth is confirmed; notify UI and navigate
-          console.debug('login-client: auth confirmed, dispatching auth-changed and navigating')
-          window.dispatchEvent(new Event('auth-changed'))
-          router.replace(safeNext || '/')
+          console.debug('login-client: auth confirmed, navigating to home then dispatching auth-changed')
+          // Navigate first to ensure the header/home receives the event when present.
+          await router.replace(safeNext || '/')
+          try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+              window.localStorage.setItem('reloadCount', '0')
+            }
+          } catch (e) {}
+          // Slight delay to allow route settlement before notifying listeners
+          setTimeout(() => window.dispatchEvent(new Event('auth-changed')), 100)
         } catch (e) {
           console.error('Auth readiness check failed', e)
           setMsg('Sign in succeeded but a follow-up check failed. Please refresh.')
