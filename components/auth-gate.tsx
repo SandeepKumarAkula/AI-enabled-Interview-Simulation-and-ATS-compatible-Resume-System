@@ -120,8 +120,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     return
   }, [status, pathname, serverAuth])
 
+  // Only decide to show modal once we have at least one server check or next-auth status is resolved.
+  const resolvedAuthState = status !== 'loading' || serverAuth !== null
+
   // Show overlay on every page for unauthenticated users, but allow /auth/* pages
-  const showModal = !(status === 'authenticated' || serverAuth === true) && !pathname.startsWith('/auth')
+  const showModal = resolvedAuthState && !(status === 'authenticated' || serverAuth === true) && !pathname.startsWith('/auth')
 
   return (
     <>
