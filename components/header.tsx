@@ -84,6 +84,7 @@ export default function Header() {
           <Link href="/#templates" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">Templates</Link>
           <Link href="/ai-interview" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">AI Interview</Link>
           <Link href="/ats" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">Check ATS</Link>
+          {/* ATS history removed */}
           {isLoggedIn && (
             <>
               <Link href="/dashboard/resumes" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">My Resumes</Link>

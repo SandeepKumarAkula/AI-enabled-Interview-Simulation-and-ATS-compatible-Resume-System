@@ -5,6 +5,8 @@
  * Uses neural networks and reinforcement learning
  * NOT generic pattern matching - actual AI intelligence
  */
+import { normalizeToPercent, INDUSTRY_WEIGHTS_STANDARD } from '@/lib/ats-scoring-utils'
+
 
 interface NeuralWeights {
   [key: string]: number
@@ -226,12 +228,39 @@ export class IntelligentATSAgent {
       reasoning
     })
 
+    // Build category breakdown (industry-standard)
+    const categoryScores: Record<string, number> = {
+      technical: normalizeToPercent(features.technicalScore, 0, 100),
+      impact: normalizeToPercent(Math.round((features.innovationScore * 0.6) + (features.jobFitScore * 0.4)), 0, 100),
+      leadership: normalizeToPercent(features.leadershipScore, 0, 100),
+      communication: normalizeToPercent(features.communicationScore, 0, 100),
+      industry: normalizeToPercent(features.cultureAlignmentScore, 0, 100),
+      certifications: 0,
+      jobfit: normalizeToPercent(features.jobFitScore, 0, 100),
+      soft_skills: normalizeToPercent(Math.round((features.communicationScore + features.leadershipScore) / 2), 0, 100)
+    }
+
+    const totalWeight = Object.values(INDUSTRY_WEIGHTS_STANDARD).reduce((a, b) => a + b, 0) || 100
+    const weightedSum =
+      (categoryScores.technical * INDUSTRY_WEIGHTS_STANDARD.technical) +
+      (categoryScores.impact * INDUSTRY_WEIGHTS_STANDARD.impact) +
+      (categoryScores.leadership * INDUSTRY_WEIGHTS_STANDARD.leadership) +
+      (categoryScores.communication * INDUSTRY_WEIGHTS_STANDARD.communication) +
+      (categoryScores.industry * INDUSTRY_WEIGHTS_STANDARD.industry) +
+      (categoryScores.certifications * INDUSTRY_WEIGHTS_STANDARD.certifications) +
+      (categoryScores.jobfit * INDUSTRY_WEIGHTS_STANDARD.jobfit) +
+      (categoryScores.soft_skills * INDUSTRY_WEIGHTS_STANDARD.soft_skills)
+
+    const normalizedScore = Math.round(weightedSum / totalWeight)
+
     return {
       score: Math.round(output),
       decision,
       confidence,
       reasoning,
-      agentThinking
+      agentThinking,
+      categoryScores,
+      normalizedScore
     }
   }
 

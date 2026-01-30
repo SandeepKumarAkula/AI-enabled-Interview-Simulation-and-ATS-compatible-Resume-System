@@ -1,12 +1,28 @@
+
 import { NextRequest, NextResponse } from "next/server"
 import { HfInference } from "@huggingface/inference"
 import { validateResumeStructure, getResumeValidationScore } from "@/lib/resume-validator"
 import { customATSAgent } from "@/lib/custom-ats-agent"
 import { rlATSAgent, type ResumFeatures } from "@/lib/rl-ats-agent"
+import { intelligentATSAgent } from "@/lib/intelligent-ats-agent"
+import { ensembleScore, normalizeToPercent, calibrateLogistic, getLeniencyMultiplier } from "@/lib/ats-scoring-utils"
 import { getUserFromToken } from "@/lib/auth"
+import nlp from 'compromise'
 
 // Initialize Hugging Face client with free API
 const hf = new HfInference(process.env.HUGGINGFACE_API_TOKEN || "")
+// Allow deterministic LLM calls by setting temperature via env
+const DEFAULT_LLM_TEMPERATURE = parseFloat(process.env.AI_MODEL_TEMPERATURE || '0')
+
+// NER mode: 'auto' | 'fallback' — set NER_MODE=fallback to force regex fallback
+const NER_MODE = process.env.NER_MODE || 'auto'
+
+// Simple in-memory circuit breaker for HF provider errors (protects against degraded performance)
+let hfErrorCount = 0
+let hfErrorWindowStart = 0
+const HF_ERROR_WINDOW_MS = 60_000
+const HF_ERROR_THRESHOLD = 3
+let hfCircuitOpenUntil = 0
 
 // ADVANCED: Large Language Model for deep semantic understanding
 // This model is trained on 176 Billion parameters and billions of text examples
@@ -19,8 +35,8 @@ const analyzeWithAdvancedLLM = async (prompt: string, context: string): Promise<
       inputs: `${prompt}\n\nContext: ${context}`,
       parameters: {
         max_new_tokens: 150,
-        temperature: 0.7,
-        top_p: 0.9,
+        temperature: DEFAULT_LLM_TEMPERATURE,
+        top_p: 0.95,
       },
     }) as any
     
@@ -307,7 +323,7 @@ const generateAISuggestions = async (
       
       // Generate suggestions based on what we actually found
       const actionVerbs = ["Engineered", "Architected", "Orchestrated", "Transformed", "Accelerated", "Pioneered", "Maximized", "Optimized"]
-      const randomAction = actionVerbs[Math.floor(Math.random() * actionVerbs.length)]
+      const randomAction = process.env.AI_DETERMINISTIC === '1' ? actionVerbs[0] : actionVerbs[Math.floor(Math.random() * actionVerbs.length)]
       
       const toneSuggestions = [
         `Passive voice detected: "${examplePassive}" - Replace with stronger action: "${randomAction} the process by..."`,
@@ -428,7 +444,40 @@ const extractNamedEntitiesAdvanced = async (text: string): Promise<{
   skills: string[]
   locations: string[]
 }> => {
+  // If no HF token configured, fall back to regex-based extraction to avoid provider auth errors
+  const hfToken = process.env.HUGGINGFACE_API_TOKEN || ""
+  if (!hfToken) {
+    console.warn("Hugging Face token not configured — using fallback NER")
+    return {
+      organizations: extractOrganizationsFallback(text),
+      skills: extractSkillsAdvanced(text),
+      locations: extractLocationsFallback(text),
+    }
+  }
+
   try {
+    // Circuit-breaker: if NER forced to fallback or circuit is open, use regex fallback
+    if (NER_MODE === 'fallback' || hfCircuitOpenUntil > Date.now()) {
+      console.warn('Using fallback NER due to NER_MODE or open circuit')
+      return { organizations: extractOrganizationsFallback(text), skills: extractSkillsAdvanced(text), locations: extractLocationsFallback(text) }
+    }
+
+    // If local NER requested, use compromise-based local extraction
+    if (NER_MODE === 'local' || process.env.USE_LOCAL_NER === '1') {
+      try {
+        const doc = nlp(text)
+        const places = doc.places ? doc.places().out('array') : []
+        const people = doc.people ? doc.people().out('array') : []
+        const organizations = extractOrganizationsFallback(text)
+        const skills = extractSkillsAdvanced(text)
+        const locations = Array.from(new Set([...(places || []), ...extractLocationsFallback(text)])).slice(0, 20)
+        return { organizations, skills, locations }
+      } catch (e) {
+        console.warn('Local NER failed, falling back to regex:', e)
+        return { organizations: extractOrganizationsFallback(text), skills: extractSkillsAdvanced(text), locations: extractLocationsFallback(text) }
+      }
+    }
+
     // Model 1: XLM-RoBERTa Large (355M parameters) - Multilingual NER
     const result1 = await hf.tokenClassification({
       model: "xlm-roberta-large-finetuned-conll03-english",
@@ -467,6 +516,10 @@ const extractNamedEntitiesAdvanced = async (text: string): Promise<{
     processResults(result1)
     processResults(result2)
 
+    // Reset error counter on success
+    hfErrorCount = 0
+    hfErrorWindowStart = 0
+
     // Add pattern-matched skills
     const patternSkills = extractSkillsAdvanced(text)
     patternSkills.forEach(skill => entities.skills.add(skill))
@@ -478,6 +531,26 @@ const extractNamedEntitiesAdvanced = async (text: string): Promise<{
     }
   } catch (error) {
     console.error("Advanced NER error:", error)
+    // If provider authentication failed, fallback to regex extraction
+    const msg = (error && (error as any).message) || ''
+    // Increment HF error counters and open circuit if threshold exceeded
+    try {
+      const now = Date.now()
+      if (hfErrorWindowStart === 0 || (now - hfErrorWindowStart) > HF_ERROR_WINDOW_MS) {
+        hfErrorWindowStart = now
+        hfErrorCount = 0
+      }
+      hfErrorCount++
+      if (hfErrorCount >= HF_ERROR_THRESHOLD) {
+        hfCircuitOpenUntil = Date.now() + HF_ERROR_WINDOW_MS
+        console.warn(`HF NER circuit opened for ${HF_ERROR_WINDOW_MS}ms due to ${hfErrorCount} errors`)
+      }
+    } catch {}
+
+    if (/invalid|unauthor/i.test(msg)) {
+      console.warn("Hugging Face authentication failed — falling back to regex NER")
+      return { organizations: extractOrganizationsFallback(text), skills: extractSkillsAdvanced(text), locations: extractLocationsFallback(text) }
+    }
     // Fallback to single model
     try {
       const result = await hf.tokenClassification({
@@ -497,7 +570,8 @@ const extractNamedEntitiesAdvanced = async (text: string): Promise<{
         skills: extractSkillsAdvanced(text),
         locations: [],
       }
-    } catch {
+    } catch (innerErr) {
+      console.error("Secondary NER fallback error:", innerErr)
       return { organizations: [], skills: extractSkillsAdvanced(text), locations: [] }
     }
   }
@@ -534,6 +608,20 @@ const extractSkillsAdvanced = (text: string): string[] => {
   })
 
   return [...new Set(skills)]
+}
+
+// Simple fallback extractor for organization names (company-like tokens)
+const extractOrganizationsFallback = (text: string): string[] => {
+  const orgPattern = /([A-Z][a-zA-Z0-9&\-]{2,}(?:\s+(?:Inc|LLC|Ltd|Corporation|Corp|GmbH|PLC))?)/g
+  const matches = text.match(orgPattern) || []
+  return Array.from(new Set(matches.map(m => m.trim()))).slice(0, 20)
+}
+
+// Simple fallback extractor for locations (city/state/country-like tokens)
+const extractLocationsFallback = (text: string): string[] => {
+  const locPattern = /([A-Z][a-z]{2,}(?:,\s*[A-Z]{2})?|\b(?:United States|USA|India|UK|United Kingdom|Germany|Canada)\b)/g
+  const matches = text.match(locPattern) || []
+  return Array.from(new Set(matches.map(m => m.trim()))).slice(0, 20)
 }
 
 // ADVANCED: Multi-Model Sentiment & Tone Analysis
@@ -707,20 +795,41 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Run all pre-trained model analyses in parallel
-    const [
-      resumeQuality,
-      resumeTone,
-      entities,
-      semanticScore,
-    ] = await Promise.all([
-      assessResumeQuality(resume),
-      analyzeResumeTone(resume),
-      extractNamedEntities(resume),
-      jobDescription && jobDescription.trim().length > 20
-        ? calculateTransformerSimilarity(resume, jobDescription)
-        : Promise.resolve(0.7), // Return 0-1 scale, not 0-100
-    ])
+    // Run all pre-trained model analyses with per-step error handling so a
+    // single model failure doesn't abort the entire pipeline.
+    let resumeQuality: any = { quality: 'moderate', confidence: 0.5, professionalScore: 50 }
+    let resumeTone: any = { sentiment: 'neutral', score: 0.5, isProfessional: false }
+    let entities: any = { organizations: [], skills: [], locations: [] }
+    let semanticScore = 0.7
+
+    try {
+      resumeQuality = await assessResumeQuality(resume)
+    } catch (e) {
+      console.error('Resume quality model failed:', e)
+    }
+
+    try {
+      resumeTone = await analyzeResumeTone(resume)
+    } catch (e) {
+      console.error('Resume tone model failed:', e)
+    }
+
+    try {
+      entities = await extractNamedEntities(resume)
+    } catch (e) {
+      console.error('Named entity extraction failed:', e)
+    }
+
+    try {
+      if (jobDescription && jobDescription.trim().length > 20) {
+        semanticScore = await calculateTransformerSimilarity(resume, jobDescription)
+      } else {
+        semanticScore = 0.7
+      }
+    } catch (e) {
+      console.error('Semantic similarity model failed:', e)
+      semanticScore = 0.7
+    }
 
     const detectedSkills = extractSkillsAdvanced(resume)
     const jobSkills = jobDescription ? extractSkillsAdvanced(jobDescription) : []
@@ -771,25 +880,134 @@ export async function POST(request: NextRequest) {
       cultureFitScore: Math.min(100, Math.max(0, cultureFitValue)) // Properly scaled 0-100
     };
     
-    // Make RL agent decision
-    const rlDecision = rlATSAgent.makeDecision(rlFeatures, jobDescription);
-    rlATSAgent.saveToLocalStorage();
-    
-    // Calculate ATS score based on RL agent Q-value and features
-    // Q-value ranges 0-1, we scale it intelligently
-    const rlScore = Math.round(rlDecision.qValue * 100);
-    
-    // Combine RL score with validation (both matter)
-    // RL agent (60%) + Validation (40%)
-    const overallAtsScore = Math.round(
-      rlScore * 0.6 + validationScore * 0.4
-    )
+    // Make RL agent decision (guarded)
+    const agentErrors: string[] = []
+    let rlDecision: any = {
+      decision: 'CONSIDER',
+      confidenceScore: 0.5,
+      qValue: 0.5,
+      predictedSuccessRate: 0.5,
+      reasoning: 'Fallback decision due to agent error',
+      candidateId: 'unknown',
+    }
 
-    // CUSTOM ATS AGENT ANALYSIS - Your proprietary AI intelligence
-    const customAgentAnalysis = await customATSAgent.analyzeResume({
-      resumeText: resume,
-      jobDescription: jobDescription,
-    })
+    try {
+      rlDecision = rlATSAgent.makeDecision(rlFeatures, jobDescription);
+      try {
+        rlATSAgent.saveToLocalStorage();
+      } catch (e) {
+        console.warn('RL agent saveToLocalStorage failed:', e)
+      }
+    } catch (e) {
+      console.error('RL agent decision failed:', e)
+      agentErrors.push('rlAgent:' + String(e))
+    }
+
+    // Calculate ATS score based on RL agent Q-value and features (0-100)
+    const rlScoreRaw = (rlDecision?.qValue || 0.5) * 100
+    const rlScore = normalizeToPercent(rlScoreRaw, 0, 100)
+
+    // Optionally call Intelligent ATS Neural agent (opt-in via env)
+    const ENABLE_INTELLIGENT = (process.env.ENABLE_INTELLIGENT_ATS === '1' || process.env.ENABLE_INTELLIGENT_ATS === 'true')
+    let intelligentScore = null
+    let intelligentDecision: any = null
+    if (ENABLE_INTELLIGENT) {
+      try {
+        // Build ML feature vector expected by IntelligentATSAgent
+        const mlFeatures = {
+          technicalScore: Math.min(100, rlFeatures.technicalScore || 0),
+          communicationScore: Math.min(100, rlFeatures.communicationScore || 0),
+          leadershipScore: Math.min(100, rlFeatures.leadershipScore || 0),
+          innovationScore: Math.min(100, Math.max(0, detectedSkills.length > 8 ? 80 : detectedSkills.length * 6)),
+          cultureAlignmentScore: Math.min(100, Math.round(semanticScore * 100)),
+          jobFitScore: Math.min(100, skillMatchPercentage || 0),
+          rawScore: resumeQuality.professionalScore || 50,
+        }
+
+        intelligentDecision = await intelligentATSAgent.makeDecision(mlFeatures as any, resume, jobDescription)
+        intelligentScore = intelligentDecision?.score || null
+      } catch (e) {
+        console.error('Intelligent ATS agent failed:', e)
+        agentErrors.push('intelligentAgent:' + String(e))
+        intelligentScore = null
+      }
+    }
+
+    // CUSTOM ATS AGENT ANALYSIS - Your proprietary AI intelligence (guarded)
+    let customAgentAnalysis: any = { score: 50, reasoning: 'fallback', confidence: 0.5, factors: [] }
+    try {
+      customAgentAnalysis = await customATSAgent.analyzeResume({
+        resumeText: resume,
+        jobDescription: jobDescription,
+      })
+    } catch (e) {
+      console.error('Custom ATS agent failed:', e)
+      agentErrors.push('customAgent:' + String(e))
+    }
+
+    // Ensemble aggregation across multiple agents to reduce variance and outliers
+    const agentScores = [
+      rlScore,
+      Math.round(customAgentAnalysis.score || 0),
+      resumeQuality.professionalScore || 50,
+    ]
+
+    // Include intelligent agent score if available
+    if (intelligentScore !== null) {
+      agentScores.push(Math.max(0, Math.min(100, intelligentScore)))
+    }
+
+    const normalizedAgentScores = agentScores.map(s => Math.max(0, Math.min(100, s)))
+
+    // Apply calibration parameters (can be tuned offline)
+    const calibration = { alpha: parseFloat(process.env.ATS_CAL_ALPHA || '1.0'), beta: parseFloat(process.env.ATS_CAL_BETA || '0.0') }
+    const ensemble = ensembleScore(normalizedAgentScores, { validationScore: validationScore, calibration })
+
+    // Allow overriding validation blend weight via env ATS_VALIDATION_WEIGHT (percent)
+    const validationWeightPct = parseFloat(process.env.ATS_VALIDATION_WEIGHT || '30')
+    let overallAtsScore = ensemble.final
+    try {
+      const v = Math.max(0, Math.min(100, validationScore || 0))
+      const calibrated = ensemble.calibrated || ensemble.final || 0
+      const w = Math.max(0, Math.min(100, validationWeightPct)) / 100
+      // Re-blend calibrated score and validation by configured weight
+      overallAtsScore = Math.round(Math.max(0, Math.min(100, (calibrated * (1 - w)) + (v * w))))
+    } catch (e) {
+      overallAtsScore = ensemble.final
+    }
+
+    // Apply global leniency multiplier (configurable via ATS_LENIENCY_PERCENT)
+    try {
+      const lenMul = getLeniencyMultiplier()
+      overallAtsScore = Math.round(Math.max(0, Math.min(100, overallAtsScore * lenMul)))
+    } catch {}
+
+    // Prepare AI-generated improvement suggestions (awaited so client receives an array)
+    let improvementSuggestions: Array<{ category: string; suggestions: string[] }> = []
+    try {
+      improvementSuggestions = await generateAISuggestions(
+        resume,
+        jobDescription,
+        {
+          skillCount: detectedSkills.length,
+          detectedSkills: detectedSkills,
+          toneConfidence: Math.round(resumeTone.score * 100),
+          specialChars: specificIssues.specialCharacters,
+          passiveVerbs: specificIssues.passiveVerbExamples,
+          metricsIssues: specificIssues.linesWithoutMetrics,
+          casualWords: specificIssues.casualWords,
+          validationScore: validationScore,
+          semanticScore: semanticScore,
+          entities: entities
+        }
+      )
+    } catch (e) {
+      console.error('generateAISuggestions failed:', e)
+      agentErrors.push('suggestions:' + String(e))
+      improvementSuggestions = []
+    }
+
+
 
     return NextResponse.json({
       success: true,
@@ -842,26 +1060,19 @@ export async function POST(request: NextRequest) {
           casualWordsUsed: specificIssues.casualWords,
         },
 
-        // AI-GENERATED IMPROVEMENT SUGGESTIONS (from AI models, not hardcoded)
-        improvementSuggestions: await generateAISuggestions(
-          resume,
-          jobDescription,
-          {
-            skillCount: detectedSkills.length,
-            detectedSkills: detectedSkills,
-            toneConfidence: Math.round(resumeTone.score * 100),
-            specialChars: specificIssues.specialCharacters,
-            passiveVerbs: specificIssues.passiveVerbExamples,
-            metricsIssues: specificIssues.linesWithoutMetrics,
-            casualWords: specificIssues.casualWords,
-            validationScore: validationScore,
-            semanticScore: semanticScore,
-            entities: entities
-          }
-        ),
+        // AI-GENERATED IMPROVEMENT SUGGESTIONS (from AI models, awaited above)
+        improvementSuggestions: improvementSuggestions,
 
-        // OVERALL ATS SCORE (based on RL agent + validation)
+        // OVERALL ATS SCORE (based on ensemble of agents + validation)
         overallScore: overallAtsScore,
+        ensembleBreakdown: {
+          median: ensemble.median,
+          mean: ensemble.mean,
+          calibrated: ensemble.calibrated,
+          final: ensemble.final,
+          agentsUsed: agentScores.length,
+          intelligentAgentIncluded: ENABLE_INTELLIGENT ? true : false
+        },
         
         // 🤖 REINFORCEMENT LEARNING AGENT DECISION
         rlAgentDecision: {
@@ -875,6 +1086,14 @@ export async function POST(request: NextRequest) {
           algorithm: "Q-Learning Reinforcement Learning",
           isRealAI: true
         },
+        // Intelligent Neural Agent decision (if enabled)
+        intelligentAgentDecision: intelligentDecision ? {
+          decision: intelligentDecision.decision,
+          score: intelligentDecision.score,
+          confidence: intelligentDecision.confidence,
+          reasoning: intelligentDecision.reasoning,
+          agentThinking: intelligentDecision.agentThinking
+        } : null,
         
         modelInfo: {
           semanticModel: "sentence-transformers/all-mpnet-base-v2 (Advanced)",
@@ -882,12 +1101,14 @@ export async function POST(request: NextRequest) {
           nerModel: "xlm-roberta-large-finetuned-conll03 (Advanced entity recognition)",
           sentimentModel: "roberta-large-mnli (Advanced sentiment analysis)",
           rlAgent: "Q-Learning with 1.7M state space (Real Reinforcement Learning)",
+          intelligentAgentIncluded: ENABLE_INTELLIGENT ? true : false,
           architecture: "State-of-the-Art Pre-trained Transformer Models + RL Decision Making",
           trainingData: "Billions of text examples from web with reinforced learning",
           isGenericAI: true,
           description: "Uses advanced pre-trained transformer neural networks with chain-of-thought reasoning + Q-Learning RL agent that learns optimal hiring decisions."
         },
       },
+      agentErrors,
     })
   } catch (error) {
     console.error("Analysis error:", error)

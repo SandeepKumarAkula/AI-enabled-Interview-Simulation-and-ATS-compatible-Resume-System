@@ -13,6 +13,7 @@ interface ResumeAnalysisContext {
   userFeedback?: any[]
   industryCategory?: string
   experienceLevel?: "entry" | "mid" | "senior" | "executive"
+  validationScore?: number
 }
 
 interface CustomScore {
@@ -77,7 +78,14 @@ export class CustomATSAgent {
     this.initializeCustomVocabulary()
     this.loadResumePatterns()
     this.initializeIndustryWeights()
-    this.loadFromLocalStorage()
+    // Only attempt to load training data from localStorage in browser environments
+    try {
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        this.loadFromLocalStorage()
+      }
+    } catch {
+      // Ignore when running on server or restricted environments
+    }
   }
 
   /**
@@ -190,7 +198,7 @@ export class CustomATSAgent {
    */
   private loadFromLocalStorage(): void {
     try {
-      const storedData = localStorage?.getItem("ats-agent-training-data")
+      const storedData = (typeof localStorage !== 'undefined' ? localStorage.getItem("ats-agent-training-data") : null)
       if (storedData) {
         this.trainingData = JSON.parse(storedData)
       }
@@ -204,7 +212,9 @@ export class CustomATSAgent {
    */
   private saveToLocalStorage(): void {
     try {
-      localStorage?.setItem("ats-agent-training-data", JSON.stringify(this.trainingData))
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem("ats-agent-training-data", JSON.stringify(this.trainingData))
+      }
     } catch (e) {
       console.error("Failed to save training data:", e)
     }
@@ -294,8 +304,53 @@ export class CustomATSAgent {
     reasoning.push(softSkillsScore.description)
 
     // Normalize score to 0-100 with experience level adjustment
+    // Industry-standard scoring: compute weighted category scores (sum to 100)
+    const industryWeightsStandard: Record<string, number> = {
+      technical: 30,        // technical skills and depth
+      impact: 25,           // quantified impact and metrics
+      leadership: 12,       // career progression and leadership
+      communication: 10,    // clarity and professional writing
+      industry: 8,          // domain expertise
+      certifications: 5,    // certifications & continuous learning
+      jobfit: 7,            // job description fit (if present)
+      soft_skills: 3        // soft skills
+    }
+
+    const totalWeight = Object.values(industryWeightsStandard).reduce((a, b) => a + b, 0) || 100
+
+    // Ensure categoryScores exist for each key and normalize to 0-100
+    const getCat = (k: string) => Math.max(0, Math.min(100, categoryScores[k] || 0))
+
+    const weightedSum =
+      (getCat('technical') * industryWeightsStandard.technical) +
+      (getCat('impact') * industryWeightsStandard.impact) +
+      (getCat('leadership') * industryWeightsStandard.leadership) +
+      (getCat('communication') * industryWeightsStandard.communication) +
+      (getCat('industry') * industryWeightsStandard.industry) +
+      (getCat('certifications') * industryWeightsStandard.certifications) +
+      (getCat('jobfit') * industryWeightsStandard.jobfit) +
+      (getCat('soft_skills') * industryWeightsStandard.soft_skills)
+
+    // Convert weighted sum to 0-100 scale
+    let finalScore = weightedSum / totalWeight
+
+    // Blend with strict validation score (parsing & formatting) - 20% weight to validation
+    const validationScore = typeof context.validationScore === 'number' ? context.validationScore : 0
+    const validationBlend = Math.max(0, Math.min(100, validationScore || 0))
+    finalScore = Math.round(finalScore * 0.8 + validationBlend * 0.2)
+
+    // Apply light experience multiplier (protect against over-inflation)
     const experienceMultiplier = this.getExperienceMultiplier(expLevel)
-    let finalScore = Math.max(0, Math.min(100, score * experienceMultiplier))
+    finalScore = Math.round(Math.max(0, Math.min(100, finalScore * (experienceMultiplier + 0.0))))
+
+    // Apply global leniency (default 10%) configurable via env `ATS_LENIENCY_PERCENT`
+    try {
+      const len = parseFloat(process.env.ATS_LENIENCY_PERCENT || '10')
+      if (!Number.isNaN(len) && isFinite(len) && len > 0) {
+        // keep it simple: increase score by len percent
+        finalScore = Math.round(Math.max(0, Math.min(100, finalScore * (1 + len / 100))))
+      }
+    } catch {}
     
     // Calculate confidence based on data quality
     const confidence = this.calculateConfidence(factors, categoryScores)

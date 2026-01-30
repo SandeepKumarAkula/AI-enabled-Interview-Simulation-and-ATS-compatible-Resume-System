@@ -34,7 +34,7 @@ export default function RootLayout({
               <Header />
               {children}
               <Footer />
-              <Analytics />
+              {process.env.NODE_ENV === 'production' ? <Analytics /> : null}
             </LoadingProvider>
           </ConfirmProvider>
         </ToastProvider>

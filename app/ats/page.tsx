@@ -7,7 +7,7 @@ import Link from "next/link"
 import { ChevronLeft, Upload, AlertCircle, CheckCircle, TrendingUp, Download, X } from "lucide-react"
 import { useToast } from "@/components/toast"
 import { useGlobalLoading } from "@/components/global-loading-provider"
-import { fetchWithAuth } from "@/lib/clientAuth"
+// fetchWithAuth removed because ATS history feature was removed
 
 interface ATSResult {
   score: number
@@ -21,6 +21,7 @@ interface ATSResult {
     matched: string[]
     missing: string[]
   }
+ 
   formatting: {
     hasContactInfo: boolean
     hasClearSections: boolean
@@ -51,7 +52,7 @@ export default function ATSPage() {
   const [aiAnalysis, setAiAnalysis] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<"input" | "result">("input")
   const [isDragging, setIsDragging] = useState(false)
-  const [saving, setSaving] = useState(false)
+  
 
   // Enhanced keyword extraction with LaTeX support
   const extractKeywords = (text: string): string[] => {
@@ -273,31 +274,6 @@ export default function ATSPage() {
         if (!aiData.success) {
           if (aiData.validationIssues && aiData.validationIssues.length > 0) {
             const issues = aiData.validationIssues.join(", ")
-
-  const handleSaveResult = async () => {
-    if (!result || !aiAnalysis) return
-    const finalResumeText = uploadedResume?.text || resumeText
-    setSaving(true)
-    try {
-      const res = await fetchWithAuth("/api/ats", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          score: result.score,
-          jobDescription,
-          resumeText: finalResumeText,
-          analysis: aiAnalysis,
-        }),
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || "Failed to save ATS report")
-      addToast("Saved ATS report to your dashboard", "success", 3500)
-    } catch (e: any) {
-      addToast(e?.message || "Failed to save", "error", 5000)
-    } finally {
-      setSaving(false)
-    }
-  }
             addToast(`Invalid Resume: ${issues}`, 'error', 5000)
           } else {
             addToast(`${aiData.error || "Error analyzing resume"}`, 'error', 4000)
@@ -318,6 +294,8 @@ export default function ATSPage() {
       setLoading(false)
     }
   }
+
+  // Save handler removed — ATS history feature disabled per user request
 
   const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -1224,24 +1202,7 @@ export default function ATSPage() {
                 Download Report
               </button>
 
-              <button
-                onClick={handleSaveResult}
-                disabled={saving}
-                className={`flex items-center gap-2 px-8 py-3 font-medium rounded-lg transition-all border ${
-                  saving
-                    ? "border-gray-300 text-gray-500 bg-gray-50 cursor-not-allowed"
-                    : "border-[#2ecc71] text-[#2ecc71] hover:bg-[#f0fdf4]"
-                }`}
-              >
-                {saving ? "Saving..." : "Save Result"}
-              </button>
-
-              <Link
-                href="/dashboard/ats"
-                className="px-8 py-3 font-medium rounded-lg border border-[#e0e0e0] text-[#222222] hover:bg-[#fafafa] transition-all"
-              >
-                View History
-              </Link>
+              {/* Save Result and View History removed per user request */}
               <button
                 onClick={() => {
                   setJobDescription("")

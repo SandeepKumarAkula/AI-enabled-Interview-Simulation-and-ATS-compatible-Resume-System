@@ -4,6 +4,8 @@
  * Trained on billions of resume data points from industry leaders
  * Makes hiring decisions based on comprehensive feature analysis
  */
+import { normalizeToPercent, INDUSTRY_WEIGHTS_STANDARD, applyLeniency, getLeniencyMultiplier } from '@/lib/ats-scoring-utils'
+
 
 export interface ResumFeatures {
   technicalScore: number; // 0-100
@@ -69,15 +71,29 @@ export class AIAgentEngine {
   private learningRate: number = 0.15; // Increased from 0.1 for faster learning
   private initialLearningRate: number = 0.15; // For scheduling
   private discountFactor: number = 0.95;
-  private explorationRate: number = 0.25; // Increased from 0.2 for better exploration
-  private initialExplorationRate: number = 0.25;
+  private explorationRate: number = 0.05; // Reduced for production stability
+  private initialExplorationRate: number = 0.05;
+  // For production stability reduce default randomness (can be overridden during testing)
+  // Lower exploration minimizes result variance between runs.
+  // NOTE: you can tweak this via runtime config if needed.
   private decisionHistory: HiringDecision[] = [];
   private trainingHistory: TrainingFeedback[] = [];
   private totalDecisions: number = 0;
   private totalTraining: number = 0;
   private successfulHires: number = 0;
+  // Deterministic mode (for reproducible scoring)
+  private deterministic: boolean = process.env.AI_DETERMINISTIC === '1';
+  private _deterministicCounter: number = 1;
+
+  private rnd(): number {
+    return this.deterministic ? 0.5 : Math.random();
+  }
 
   constructor() {
+    // If deterministic mode requested, reduce exploration for reproducible decisions
+    if (this.deterministic) {
+      this.explorationRate = 0;
+    }
     this.initializeQTable();
   }
 
@@ -115,7 +131,7 @@ export class AIAgentEngine {
                 );
                 
                 // Add random variations to simulate real-world complexity (±10%)
-                const variation = (Math.random() - 0.5) * 0.2;
+                const variation = (this.rnd() - 0.5) * 0.2;
                 const hireValue = Math.max(0.1, Math.min(1.0, baseHireValue + variation));
                 
                 // Consider is "in between" - for marginal candidates
@@ -197,7 +213,7 @@ export class AIAgentEngine {
     
     for (let i = 0; i < count; i++) {
       // Select random distribution based on weights
-      let rand = Math.random();
+      let rand = this.rnd();
       let distribution = distributions[0];
       let cumulativeWeight = 0;
       for (const dist of distributions) {
@@ -209,12 +225,12 @@ export class AIAgentEngine {
       }
       
       // Generate candidate features from selected distribution (realistic profiles)
-      const technicalScore = distribution.tech[0] + Math.random() * (distribution.tech[1] - distribution.tech[0]);
-      const experienceYears = distribution.exp[0] + Math.random() * (distribution.exp[1] - distribution.exp[0]);
-      const educationLevel = Math.round(distribution.edu[0] + Math.random() * (distribution.edu[1] - distribution.edu[0]));
-      const communicationScore = distribution.comm[0] + Math.random() * (distribution.comm[1] - distribution.comm[0]);
-      const leadershipScore = distribution.lead[0] + Math.random() * (distribution.lead[1] - distribution.lead[0]);
-      const cultureFitScore = distribution.cult[0] + Math.random() * (distribution.cult[1] - distribution.cult[0]);
+      const technicalScore = distribution.tech[0] + this.rnd() * (distribution.tech[1] - distribution.tech[0]);
+      const experienceYears = distribution.exp[0] + this.rnd() * (distribution.exp[1] - distribution.exp[0]);
+      const educationLevel = Math.round(distribution.edu[0] + this.rnd() * (distribution.edu[1] - distribution.edu[0]));
+      const communicationScore = distribution.comm[0] + this.rnd() * (distribution.comm[1] - distribution.comm[0]);
+      const leadershipScore = distribution.lead[0] + this.rnd() * (distribution.lead[1] - distribution.lead[0]);
+      const cultureFitScore = distribution.cult[0] + this.rnd() * (distribution.cult[1] - distribution.cult[0]);
       
       // Calculate realistic hiring probability from features (balanced approach)
       const averageScore = (
@@ -227,15 +243,15 @@ export class AIAgentEngine {
       );
       
       // Add randomness to hiring decisions (real hiring has subjectivity)
-      const randomFactor = (Math.random() - 0.5) * 0.3; // ±15% randomness
+      const randomFactor = (this.rnd() - 0.5) * 0.3; // ±15% randomness
       const hiringProbability = Math.max(0.05, Math.min(0.95, averageScore + randomFactor));
       
       // Simulate realistic outcomes (more balanced - not purely meritocratic)
-      const hired = Math.random() < hiringProbability; // Better profiles more likely hired
+      const hired = this.rnd() < hiringProbability; // Better profiles more likely hired
       
       // Simulate performance if hired
       const performanceRating = hired
-        ? Math.min(5, Math.max(1, averageScore * 5 + (Math.random() - 0.5))) // 1-5 scale
+        ? Math.min(5, Math.max(1, averageScore * 5 + (this.rnd() - 0.5))) // 1-5 scale
         : 0; // Not hired
       
       data.push({
@@ -362,9 +378,18 @@ export class AIAgentEngine {
     const safeQConsider = Math.max(0, Math.min(1, qValues.consider || 0.4));
     const safeQReject = Math.max(0, Math.min(1, qValues.reject || 0.3));
     
-    const hireScore = safeQHire * blendRatio + adjustedFeatureScore * (1 - blendRatio);
-    const considerScore = safeQConsider * blendRatio + (adjustedFeatureScore * 0.75) * (1 - blendRatio);
-    const rejectScore = safeQReject * blendRatio + ((1 - adjustedFeatureScore) * 0.6) * (1 - blendRatio);
+    let hireScore = safeQHire * blendRatio + adjustedFeatureScore * (1 - blendRatio);
+    let considerScore = safeQConsider * blendRatio + (adjustedFeatureScore * 0.75) * (1 - blendRatio);
+    let rejectScore = safeQReject * blendRatio + ((1 - adjustedFeatureScore) * 0.6) * (1 - blendRatio);
+
+    // Apply global leniency synchronously (configured via ATS_LENIENCY_PERCENT)
+    try {
+      const lenMul = getLeniencyMultiplier();
+      hireScore = Math.min(1, hireScore * lenMul);
+      considerScore = Math.min(1, considerScore * lenMul);
+      // Slightly reduce reject score when leniency increases hires/considers
+      rejectScore = Math.min(1, rejectScore * (1 / Math.max(1, lenMul)));
+    } catch (e) {}
     
     let action: 'hire' | 'reject' | 'consider';
     
@@ -374,10 +399,10 @@ export class AIAgentEngine {
     // Below 0.35 = REJECT (bottom 15%)
     // LENIENT thresholds - more accepting, 10% liberal
     
-    if (Math.random() < this.explorationRate) {
+    if (this.rnd() < this.explorationRate) {
       // Explore: random action
       const actions = ['hire', 'reject', 'consider'] as const;
-      action = actions[Math.floor(Math.random() * 3)];
+      action = actions[Math.floor(this.rnd() * 3)];
     } else {
       // Exploit with LENIENT thresholds - 10% more liberal
       // HIRE: 0.50+ (top 50%) - Accept half of good candidates
@@ -405,18 +430,52 @@ export class AIAgentEngine {
     const reasoning = this.generateReasoning(features, action, jobDescription);
     
     const decision: HiringDecision = {
-      candidateId: `candidate-${Date.now()}`,
+      candidateId: this.deterministic ? `candidate-${this._deterministicCounter++}` : `candidate-${Date.now()}`,
       decision: action.toUpperCase() as any,
       confidenceScore: Math.max(0, Math.min(1, confidenceScore)),
       reasoning,
       predictedSuccessRate: confidenceScore,
       qValue: confidenceScore, // Use confidence score as Q-value
-      timestamp: Date.now()
+      timestamp: this.deterministic ? 0 : Date.now()
     };
-    
+
+    // Add industry-standard category breakdown and normalized score
+    const categoryScores: Record<string, number> = {
+      technical: normalizeToPercent(features.technicalScore, 0, 100),
+      impact: normalizeToPercent(Math.min(100, (features.experienceYears / 10) * 100), 0, 100),
+      leadership: normalizeToPercent(features.leadershipScore, 0, 100),
+      communication: normalizeToPercent(features.communicationScore, 0, 100),
+      industry: normalizeToPercent(features.educationLevel, 0, 10),
+      certifications: 0,
+      jobfit: 0,
+      soft_skills: 0
+    }
+
+    const totalWeight = Object.values(INDUSTRY_WEIGHTS_STANDARD).reduce((a, b) => a + b, 0) || 100
+    const weightedSum =
+      (categoryScores.technical * INDUSTRY_WEIGHTS_STANDARD.technical) +
+      (categoryScores.impact * INDUSTRY_WEIGHTS_STANDARD.impact) +
+      (categoryScores.leadership * INDUSTRY_WEIGHTS_STANDARD.leadership) +
+      (categoryScores.communication * INDUSTRY_WEIGHTS_STANDARD.communication) +
+      (categoryScores.industry * INDUSTRY_WEIGHTS_STANDARD.industry) +
+      (categoryScores.certifications * INDUSTRY_WEIGHTS_STANDARD.certifications) +
+      (categoryScores.jobfit * INDUSTRY_WEIGHTS_STANDARD.jobfit) +
+      (categoryScores.soft_skills * INDUSTRY_WEIGHTS_STANDARD.soft_skills)
+
+    let normalizedScore = Math.round(weightedSum / totalWeight)
+    try {
+      const len = parseFloat(process.env.ATS_LENIENCY_PERCENT || '10')
+      if (!Number.isNaN(len) && isFinite(len) && len > 0) {
+        normalizedScore = applyLeniency(normalizedScore, len)
+      }
+    } catch {}
+
+    ;(decision as any).categoryScores = categoryScores
+    ;(decision as any).normalizedScore = normalizedScore
+
     this.decisionHistory.push(decision);
     this.totalDecisions++;
-    
+
     return decision;
   }
 

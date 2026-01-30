@@ -139,9 +139,10 @@ export function middleware(request: NextRequest) {
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
 
   // Permissions Policy
-  // Allow camera/microphone only where needed (AI interview).
-  // Blocking these globally causes browser "Permissions policy violation: camera is not allowed".
-  const needsMedia = pathname.startsWith('/ai-interview')
+  // Allow camera/microphone for the AI interview route. During local development
+  // also allow media so browsers don't block getUserMedia on non-HTTPS dev setups.
+  const isDev = (process.env.NODE_ENV || 'development') !== 'production'
+  const needsMedia = isDev || pathname.startsWith('/ai-interview')
   response.headers.set(
     'Permissions-Policy',
     needsMedia

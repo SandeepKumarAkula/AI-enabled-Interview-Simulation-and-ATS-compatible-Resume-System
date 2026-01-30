@@ -205,6 +205,7 @@ export function AIInterviewer() {
   const [videoSeconds, setVideoSeconds] = useState(0)
   const lastVideoStart = useRef<number | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false)
 
   const recorderRef = useRef<MediaRecorder | null>(null)
   const recordedChunksRef = useRef<BlobPart[]>([])
@@ -991,8 +992,9 @@ export function AIInterviewer() {
   }
 
   const startCamera = async () => {
+    let requestId = 0
     try {
-      const requestId = ++cameraRequestSeq.current
+      requestId = ++cameraRequestSeq.current
       console.log("Starting camera...")
       
       // Check if we already have an active stream from setup
@@ -1010,11 +1012,46 @@ export function AIInterviewer() {
         }
       }
       
-      // Get fresh stream if none exists or previous one died
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: { ideal: 1280 }, height: { ideal: 720 } }, 
-        audio: false 
-      })
+      // Small delay to avoid permission race on first page load in some browsers
+      await new Promise((res) => setTimeout(res, 150))
+
+      // Stop any existing tracks before requesting a new stream to avoid conflicts
+      try {
+        if (mediaStreamRef.current) {
+          mediaStreamRef.current.getTracks().forEach(t => t.stop())
+          mediaStreamRef.current = null
+        }
+      } catch {}
+
+      // First try a minimal constraint to avoid some browser restrictions
+      let stream: MediaStream | null = null
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      } catch (e) {
+        // If minimal constraint fails, fall back to more specific constraints below
+        stream = null
+      }
+
+      // If initial simple request didn't work, try Permissions API quick check (best-effort)
+      if (!stream) {
+        try {
+          if (typeof navigator !== 'undefined' && (navigator as any).permissions && cameraRequestSeq.current <= 1) {
+            const p: any = await (navigator as any).permissions.query({ name: 'camera' })
+            if (p && p.state === 'denied') {
+              // Inform user that camera is blocked at the browser/site level
+              throw new Error('Permission denied (camera blocked by browser settings)')
+            }
+          }
+        } catch (permErr) {
+          // ignore
+        }
+
+        // Try a more targeted request with ideal resolution
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        })
+      }
       console.log("Fresh camera stream obtained:", stream)
 
       // If the user stopped/ended while getUserMedia was in-flight, don't re-enable the camera.
@@ -1048,8 +1085,82 @@ export function AIInterviewer() {
     } catch (err: any) {
       console.error("❌ Camera error:", err)
       setCameraReady(false)
-      setCameraError("Camera access denied or unavailable: " + err.message)
-      addToast("Camera access is required", "error")
+
+      const errName = err?.name || ''
+      const isDenied = errName === 'NotAllowedError' || /permission denied/i.test(err?.message || '')
+
+      // Try automatic retries for transient permission races on first load
+      if (isDenied) {
+        let success = false
+        const backoffs = [200, 500, 1000]
+        for (let i = 0; i < backoffs.length; i++) {
+          // Respect any newer requests
+          if (cameraRequestSeq.current !== requestId) break
+          await new Promise(r => setTimeout(r, backoffs[i]))
+          try {
+            // Try enumerating devices and request by deviceId to avoid some browser quirks
+            let constraints: any = { video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }
+            try {
+              const devices = await navigator.mediaDevices.enumerateDevices()
+              const videoDevice = devices.find(d => d.kind === 'videoinput')
+              if (videoDevice && videoDevice.deviceId) {
+                constraints = { video: { deviceId: { exact: videoDevice.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }
+              }
+            } catch {
+              // ignore enumerate errors and fall back to generic constraints
+            }
+
+            const retriedStream = await navigator.mediaDevices.getUserMedia(constraints)
+            if (cameraRequestSeq.current !== requestId) {
+              retriedStream.getTracks().forEach((t: MediaStreamTrack) => t.stop())
+              break
+            }
+            mediaStreamRef.current = retriedStream
+            if (videoRef.current) videoRef.current.srcObject = retriedStream
+            if (previewVideoRef.current) previewVideoRef.current.srcObject = retriedStream
+            setCameraOn(true)
+            setCameraReady(true)
+            lastVideoStart.current = Date.now()
+            setCameraError(null)
+            success = true
+            break
+          } catch (e) {
+            console.warn(`Retry ${i + 1} failed:`, e)
+            continue
+          }
+        }
+
+        if (!success) {
+          setCameraPermissionDenied(true)
+          setCameraError("Camera permission denied. Please allow camera access in your browser and retry. See console for diagnostics.")
+
+          // Diagnostic information to help understand persistent NotAllowedError
+          try {
+            (async () => {
+              try {
+                const p = (navigator as any).permissions ? await (navigator as any).permissions.query({ name: 'camera' }) : null
+                console.error('Camera permission state (diagnostic):', p && p.state ? p.state : 'unavailable')
+              } catch (pe) {
+                console.error('Permissions API query failed:', pe)
+              }
+
+              try {
+                const devices = await navigator.mediaDevices.enumerateDevices()
+                console.error('Enumerated media devices (diagnostic):', devices)
+              } catch (de) {
+                console.error('enumerateDevices failed:', de)
+              }
+
+              console.error('Location protocol:', window.location.protocol)
+              console.error('User agent:', navigator.userAgent)
+            })()
+          } catch (diagErr) {
+            console.error('Diagnostics logging failed:', diagErr)
+          }
+        }
+      } else {
+        setCameraError("Camera access denied or unavailable: " + err.message)
+      }
     }
   }
 
