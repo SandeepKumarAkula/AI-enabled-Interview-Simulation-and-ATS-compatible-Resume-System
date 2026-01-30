@@ -124,7 +124,15 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const resolvedAuthState = status !== 'loading' || serverAuth !== null
 
   // Show overlay on every page for unauthenticated users, but allow /auth/* pages
-  const showModal = resolvedAuthState && !(status === 'authenticated' || serverAuth === true) && !pathname.startsWith('/auth')
+  // Don't show immediately after an explicit logout to prevent a brief flash while the app navigates.
+  let showModal = resolvedAuthState && !(status === 'authenticated' || serverAuth === true) && !pathname.startsWith('/auth')
+  try {
+    if (showModal && typeof window !== 'undefined' && window.localStorage) {
+      const loggedOutAt = parseInt(window.localStorage.getItem('authLoggedOut') || '0', 10)
+      // If the user logged out less than 2s ago, delay showing the modal to avoid a brief flash.
+      if (loggedOutAt && Date.now() - loggedOutAt < 2000) showModal = false
+    }
+  } catch (e) {}
 
   return (
     <>

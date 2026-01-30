@@ -45,6 +45,11 @@ export default function Header() {
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem('authLoggedOut', String(Date.now()))
+      }
+    } catch (e) {}
     window.dispatchEvent(new Event('auth-changed'))
     router.replace('/auth/login')
   }
