@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { fetchWithAuth } from '@/lib/clientAuth'
 
@@ -9,6 +9,7 @@ import { fetchWithAuth } from '@/lib/clientAuth'
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [isChecking, setIsChecking] = useState(true)
   const router = useRouter()
+  const pathname = usePathname()
   const { status } = useSession()
 
   useEffect(() => {
@@ -16,7 +17,9 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     if (status === 'loading') return
 
     if (status === 'unauthenticated') {
-      router.push('/auth/login')
+      const pathname = usePathname()
+      // Redirect to login and include next so we can return here after login
+      router.push(`/auth/login?next=${encodeURIComponent(pathname)}`)
       return
     }
 
