@@ -44,6 +44,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         isReloadingRef.current = true
         console.debug('auth-gate: server confirmed auth after auth-changed, refreshing router and updating state')
         try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            try { window.localStorage.setItem('authReloaded', '1') } catch (e) {}
+          }
           setServerAuth(true)
           // Trigger server-side revalidation/data fetch without a full page reload
           router.refresh()
@@ -67,6 +70,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             isReloadingRef.current = true
             console.debug('auth-gate: server confirmed auth during background poll, refreshing router and updating state')
             try {
+              if (typeof window !== 'undefined' && window.localStorage) {
+                try { window.localStorage.setItem('authReloaded', '1') } catch (e) {}
+              }
               setServerAuth(true)
               router.refresh()
             } finally {
@@ -110,6 +116,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           isReloadingRef.current = true
           console.debug('auth-gate: server auth detected during modal poll, refreshing router and updating state')
           try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+              try { window.localStorage.setItem('authReloaded', '1') } catch (e) {}
+            }
             setServerAuth(true)
             router.refresh()
           } finally {
