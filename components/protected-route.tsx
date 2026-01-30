@@ -5,6 +5,21 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { fetchWithAuth } from '@/lib/clientAuth'
 
+// Force reload twice after login to work around session hydration issues
+function useDoubleReload() {
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const reloadCount = parseInt(window.localStorage.getItem('reloadCount') || '0', 10)
+      if (reloadCount < 2) {
+        window.localStorage.setItem('reloadCount', String(reloadCount + 1))
+        window.location.reload()
+      } else {
+        window.localStorage.removeItem('reloadCount')
+      }
+    }
+  }, [])
+}
+
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [isChecking, setIsChecking] = useState(true)
   const router = useRouter()
@@ -37,6 +52,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
       }
     }
   }, [])
+  useDoubleReload()
 
   if (status === 'loading' || isChecking) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   return <>{children}</>
