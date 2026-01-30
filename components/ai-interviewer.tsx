@@ -1132,7 +1132,7 @@ export function AIInterviewer() {
 
         if (!success) {
           setCameraPermissionDenied(true)
-          setCameraError("Camera permission denied. Please allow camera access in your browser and retry. See console for diagnostics.")
+          setCameraError("Camera permission denied. Please allow camera access in your browser settings and reload the page to retry.")
 
           // Diagnostic information to help understand persistent NotAllowedError
           try {
