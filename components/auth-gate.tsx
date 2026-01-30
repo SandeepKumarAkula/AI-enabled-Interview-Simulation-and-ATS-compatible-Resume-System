@@ -25,12 +25,40 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   // Reload when login completes (client code dispatches this event after login)
   useEffect(() => {
+    async function checkWithRetries(tries = 6, delayMs = 500) {
+      for (let i = 0; i < tries; i++) {
+        console.debug('auth-gate: auth-changed check attempt', i + 1, 'of', tries)
+        const ok = await checkServerAuth()
+        if (ok) return true
+        await new Promise(res => setTimeout(res, delayMs))
+      }
+      return false
+    }
+
     async function handleAuthChanged() {
-      // Re-check server auth; if ready, hide modal and reload the page
-      const ready = await checkServerAuth()
+      // Re-check server auth with retries; if ready, hide modal and reload the page
+      const ready = await checkWithRetries(8, 500)
       if (ready) {
-        // Hard reload to ensure server session cookies are read
+        console.debug('auth-gate: server confirmed auth after auth-changed, reloading')
         window.location.replace(window.location.href)
+      } else {
+        console.debug('auth-gate: server auth not yet available after auth-changed; starting background poll')
+        // Start background poll that checks every 1s up to 15s
+        let elapsed = 0
+        const interval = setInterval(async () => {
+          elapsed += 1000
+          const ok = await checkServerAuth()
+          if (ok) {
+            clearInterval(interval)
+            console.debug('auth-gate: server confirmed auth during background poll, reloading')
+            window.location.replace(window.location.href)
+          }
+          if (elapsed >= 15000) {
+            clearInterval(interval)
+            console.debug('auth-gate: background poll ended without auth')
+            setServerAuth(false)
+          }
+        }, 1000)
       }
     }
     window.addEventListener('auth-changed', handleAuthChanged)
@@ -41,6 +69,29 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     checkServerAuth()
   }, [checkServerAuth])
+
+  // While modal is visible, poll server periodically in case cookies are just being set
+  useEffect(() => {
+    let stop = false
+    async function poll() {
+      const shouldPoll = !(status === 'authenticated' || serverAuth === true) && !pathname.startsWith('/auth')
+      if (!shouldPoll) return
+      let elapsed = 0
+      while (!stop && elapsed < 15000) {
+        await new Promise(res => setTimeout(res, 1000))
+        const ok = await checkServerAuth()
+        if (ok) {
+          console.debug('auth-gate: server auth detected during modal poll, reloading')
+          window.location.replace(window.location.href)
+          return
+        }
+        elapsed += 1000
+      }
+    }
+
+    poll()
+    return () => { stop = true }
+  }, [status, serverAuth, pathname, checkServerAuth])
 
   // Focus the modal so keyboard users can't interact with background
   useEffect(() => {
