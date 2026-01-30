@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/toast"
+import { fetchWithAuth } from "@/lib/clientAuth"
 import { downloadInterviewReportPdf } from "@/lib/interview-report-pdf"
 import {
   AlertCircle,
@@ -721,7 +722,7 @@ export function AIInterviewer() {
       console.log("VideoRef current before API call:", videoRef.current)
       console.log("Camera stream before API call:", videoRef.current?.srcObject)
       
-      const response = await fetch("/api/ai-interview", {
+      const response = await fetchWithAuth("/api/ai-interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -813,7 +814,7 @@ export function AIInterviewer() {
         videoSeconds
       })
 
-      const response = await fetch("/api/ai-interview", {
+      const response = await fetchWithAuth("/api/ai-interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -898,7 +899,7 @@ export function AIInterviewer() {
       // Stop recording as soon as session ends. For manual ends, we discard.
       recordedBlob = await stopRecordingVideo(!isAutoEnd)
 
-      const response = await fetch("/api/ai-interview", {
+      const response = await fetchWithAuth("/api/ai-interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -918,7 +919,7 @@ export function AIInterviewer() {
       // We include `meta` with the AI session id to avoid duplicates on retries.
       if (isAutoEnd && data?.report) {
         try {
-          const saved = await fetch('/api/interviews', {
+          const saved = await fetchWithAuth('/api/interviews', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -926,7 +927,6 @@ export function AIInterviewer() {
               meta: JSON.stringify({ aiSessionId: currentSessionId }),
               reportContent: data.report,
             }),
-            credentials: 'include',
           })
 
           if (saved.ok) {
@@ -1285,7 +1285,7 @@ export function AIInterviewer() {
       addToast('Uploading interview recording…', 'info')
 
       const ext = (blob.type && blob.type.includes('webm')) ? 'webm' : 'webm'
-      const presign = await fetch('/api/uploads/presign', {
+      const presign = await fetchWithAuth('/api/uploads/presign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1293,7 +1293,6 @@ export function AIInterviewer() {
           contentType: blob.type || 'video/webm',
           type: 'videos',
         }),
-        credentials: 'include',
       })
 
       if (!presign.ok) {
@@ -1311,11 +1310,10 @@ export function AIInterviewer() {
         throw new Error('Failed to upload recording')
       }
 
-      const attach = await fetch('/api/interviews/attach-video', {
+      const attach = await fetchWithAuth('/api/interviews/attach-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ interviewId, key }),
-        credentials: 'include',
       })
       if (!attach.ok) {
         const json = await attach.json().catch(() => ({}))

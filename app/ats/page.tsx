@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea"
 import Link from "next/link"
 import { ChevronLeft, Upload, AlertCircle, CheckCircle, TrendingUp, Download, X } from "lucide-react"
 import { useToast } from "@/components/toast"
+import { fetchWithAuth } from "@/lib/clientAuth"
 import { useGlobalLoading } from "@/components/global-loading-provider"
 // fetchWithAuth removed because ATS history feature was removed
 
@@ -259,7 +260,7 @@ export default function ATSPage() {
     setLoading(true)
     try {
       await withGlobalLoading(async () => {
-        const aiResponse = await fetch("/api/analyze-resume", {
+        const aiResponse = await fetchWithAuth("/api/analyze-resume", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
