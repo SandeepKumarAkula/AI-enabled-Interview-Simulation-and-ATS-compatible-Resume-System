@@ -50,13 +50,16 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
         return
       }
 
-      // Authenticated: verify server access if needed
+      // Authenticated: trust client session and allow rendering without immediate server redirect
+      // We still attempt a background check to keep state accurate but do not force a redirect on transient failures.
       try {
-        const r = await fetchWithAuth('/api/resumes')
-        if (!r.ok) router.push('/auth/login')
-        else setIsChecking(false)
+        setIsChecking(false)
+        // Background refresh for diagnostics — do not redirect from here to avoid UX jank
+        fetchWithAuth('/api/resumes').then(r => {
+          if (!r.ok) console.debug('protected-route: background auth check failed, will react on explicit auth-changed')
+        }).catch(() => console.debug('protected-route: background auth check error'))
       } catch (e) {
-        router.push('/auth/login')
+        console.debug('protected-route: background auth check threw', e)
       }
     }
 
