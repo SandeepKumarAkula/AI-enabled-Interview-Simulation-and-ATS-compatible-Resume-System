@@ -42,8 +42,14 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       if (ready) {
         if (isReloadingRef.current) return
         isReloadingRef.current = true
-        console.debug('auth-gate: server confirmed auth after auth-changed, reloading')
-        window.location.replace(window.location.href)
+        console.debug('auth-gate: server confirmed auth after auth-changed, refreshing router and updating state')
+        try {
+          setServerAuth(true)
+          // Trigger server-side revalidation/data fetch without a full page reload
+          router.refresh()
+        } finally {
+          // leave isReloadingRef set to avoid further reloads
+        }
       } else {
         console.debug('auth-gate: server auth not yet available after auth-changed; starting background poll')
         // Start background poll that checks every 1s up to 15s
@@ -59,8 +65,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             clearInterval(interval)
             if (isReloadingRef.current) return
             isReloadingRef.current = true
-            console.debug('auth-gate: server confirmed auth during background poll, reloading')
-            window.location.replace(window.location.href)
+            console.debug('auth-gate: server confirmed auth during background poll, refreshing router and updating state')
+            try {
+              setServerAuth(true)
+              router.refresh()
+            } finally {
+              // leave isReloadingRef set to avoid further reloads
+            }
           }
           if (elapsed >= 15000) {
             clearInterval(interval)
@@ -97,8 +108,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           try { if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem('authPending') } catch (e) {}
           if (isReloadingRef.current) return
           isReloadingRef.current = true
-          console.debug('auth-gate: server auth detected during modal poll, reloading')
-          window.location.replace(window.location.href)
+          console.debug('auth-gate: server auth detected during modal poll, refreshing router and updating state')
+          try {
+            setServerAuth(true)
+            router.refresh()
+          } finally {
+            // leave isReloadingRef set to avoid further reloads
+          }
           return
         }
         elapsed += 1000
