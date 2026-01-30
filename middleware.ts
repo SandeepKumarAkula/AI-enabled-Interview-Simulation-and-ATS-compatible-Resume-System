@@ -98,6 +98,11 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/rl-agent')
 
   if (isProtectedPage && !token) {
+    // Log when protected page access has no token
+    try {
+      // eslint-disable-next-line no-console
+      console.debug('middleware: protected page access without token', { pathname })
+    } catch (e) {}
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     url.searchParams.set('next', pathname + (search || ''))

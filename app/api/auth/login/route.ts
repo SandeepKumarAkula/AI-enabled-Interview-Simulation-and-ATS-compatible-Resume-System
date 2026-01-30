@@ -32,6 +32,14 @@ export async function POST(req: Request) {
       sameSite: 'lax'
     })
 
+    // Log success (no sensitive data)
+    try {
+      // eslint-disable-next-line no-console
+      console.debug(`Login success for user=${user.email} id=${user.id}`)
+    } catch (e) {
+      // swallow
+    }
+
     return res
   } catch (error: any) {
     console.error('Login error:', error)

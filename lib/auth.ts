@@ -35,14 +35,24 @@ function parseTokenFromRequestOrString(input?: Request | string) {
 
 export async function getUserFromToken(input?: Request | string) {
   const token = parseTokenFromRequestOrString(input)
-  if (!token) return null
+  if (!token) {
+    // eslint-disable-next-line no-console
+    console.debug('getUserFromToken: no token found in request')
+    return null
+  }
   try {
     const secret = getJwtSecret()
     if (!secret) return null
     const payload = jwt.verify(token, secret) as any
     const user = await prisma.user.findUnique({ where: { id: payload.sub } })
+    if (!user) {
+      // eslint-disable-next-line no-console
+      console.debug('getUserFromToken: token valid but no user found for id=', payload.sub)
+    }
     return user
-  } catch (e) {
+  } catch (e: any) {
+    // eslint-disable-next-line no-console
+    console.debug('getUserFromToken: token verification failed:', e && e.message ? e.message : e)
     return null
   }
 }
