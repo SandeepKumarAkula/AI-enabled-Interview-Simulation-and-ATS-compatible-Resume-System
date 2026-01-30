@@ -78,11 +78,25 @@ export default function LoginClient() {
         try {
           const ready = await waitForAuthReady(6, 500)
           if (!ready) {
-            // If still not ready, show a helpful message and fallback to debug token if available
-            setMsg('Sign in succeeded, but server session not yet available. Please refresh if you are not redirected.')
+            // If still not ready, we still treat login as successful and trigger a site-wide re-check.
+            // This avoids leaving the mandatory modal visible when the session becomes available shortly.
+            setMsg('Sign in succeeded. Finalizing session—if you are not redirected automatically, please refresh.')
+            console.debug('login-client: auth readiness check failed; forcing auth-changed and navigation')
+
+            // Navigate first to ensure the header/home receives the event when present.
+            await router.replace(safeNext || '/')
+            try {
+              if (typeof window !== 'undefined' && window.localStorage) {
+                window.localStorage.setItem('reloadCount', '0')
+                window.localStorage.setItem('authPending', String(Date.now()))
+              }
+            } catch (e) {}
+
+            // Dispatch event so AuthGate will aggressively re-check server auth
+            setTimeout(() => window.dispatchEvent(new Event('auth-changed')), 100)
+
             // Ensure spinner clears so user can interact.
             setLoading(false)
-            console.debug('login-client: auth readiness check failed after retries')
             return
           }
 
@@ -93,6 +107,8 @@ export default function LoginClient() {
           try {
             if (typeof window !== 'undefined' && window.localStorage) {
               window.localStorage.setItem('reloadCount', '0')
+              // Clear any pending auth marker
+              window.localStorage.removeItem('authPending')
             }
           } catch (e) {}
           // Slight delay to allow route settlement before notifying listeners

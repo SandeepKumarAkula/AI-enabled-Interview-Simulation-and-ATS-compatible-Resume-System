@@ -76,16 +76,25 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     async function poll() {
       const shouldPoll = !(status === 'authenticated' || serverAuth === true) && !pathname.startsWith('/auth')
       if (!shouldPoll) return
+      // If login recently happened client-side, be more aggressive
+      const authPending = typeof window !== 'undefined' && window.localStorage && window.localStorage.getItem('authPending')
       let elapsed = 0
-      while (!stop && elapsed < 15000) {
+      const timeout = authPending ? 30000 : 15000
+      while (!stop && elapsed < timeout) {
         await new Promise(res => setTimeout(res, 1000))
         const ok = await checkServerAuth()
         if (ok) {
+          // Clear pending marker if present
+          try { if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem('authPending') } catch (e) {}
           console.debug('auth-gate: server auth detected during modal poll, reloading')
           window.location.replace(window.location.href)
           return
         }
         elapsed += 1000
+      }
+      if (!stop) {
+        console.debug('auth-gate: modal poll finished without detecting auth')
+        setServerAuth(false)
       }
     }
 
