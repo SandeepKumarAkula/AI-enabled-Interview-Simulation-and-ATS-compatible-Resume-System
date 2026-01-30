@@ -88,7 +88,8 @@ export default function LoginClient() {
             setMsg('Sign in succeeded. Finalizing session—if you are not redirected automatically, please refresh.')
             console.debug('login-client: auth readiness check failed; forcing auth-changed and navigation')
 
-            // Navigate first to ensure the header/home or original protected page receives the event.
+            // Mark that we've just logged in and navigate to home while UI updates via events.
+            try { if (typeof window !== 'undefined' && window.localStorage) { try { window.localStorage.setItem('justLoggedIn', String(Date.now())) } catch (e) {} } } catch (e) {}
             await router.replace(safeNext || '/')
             try {
               if (typeof window !== 'undefined' && window.localStorage) {
@@ -107,8 +108,7 @@ export default function LoginClient() {
 
           // Auth is confirmed; notify UI and navigate
           console.debug('login-client: auth confirmed, navigating to home then dispatching auth-changed')
-          // Navigate first to ensure the header/home or original protected page receives the event.
-          await router.replace(safeNext || '/')
+          // Navigate first to ensure the header/home or original protected page receives the event.          try { if (typeof window !== 'undefined' && window.localStorage) { try { window.localStorage.setItem('justLoggedIn', String(Date.now())) } catch (e) {} } } catch (e) {}          await router.replace(safeNext || '/')
           try {
             if (typeof window !== 'undefined' && window.localStorage) {
               // Clear any pending auth marker

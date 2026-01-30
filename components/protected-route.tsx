@@ -29,13 +29,24 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
         // Otherwise, give the client a chance to have cookies settle (if a login just occurred).
         let tries = 6
-        try { if (typeof window !== 'undefined' && window.localStorage && window.localStorage.getItem('authPending')) tries = 30 } catch (e) {}
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            const pending = window.localStorage.getItem('authPending')
+            if (pending) tries = 30
+
+            const justLogged = parseInt(window.localStorage.getItem('justLoggedIn') || '0', 10)
+            // If we just logged in within the last 10s, be more patient
+            if (justLogged && Date.now() - justLogged < 10000) tries = Math.max(tries, 30)
+          }
+        } catch (e) {}
 
         for (let i = 0; i < tries; i++) {
           try {
             const ok = await fetchWithAuth('/api/resumes').then(r => r.ok).catch(() => false)
             if (ok) {
               // Server considers the user authenticated; continue without redirect
+              try { if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem('justLoggedIn') } catch (e) {}
+              try { if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem('authPending') } catch (e) {}
               setIsChecking(false)
               return
             }
