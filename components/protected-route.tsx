@@ -17,7 +17,6 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     if (status === 'loading') return
 
     if (status === 'unauthenticated') {
-      const pathname = usePathname()
       // Redirect to login and include next so we can return here after login
       router.push(`/auth/login?next=${encodeURIComponent(pathname)}`)
       return
