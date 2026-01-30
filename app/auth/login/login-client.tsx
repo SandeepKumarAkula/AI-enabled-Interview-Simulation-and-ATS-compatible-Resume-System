@@ -44,7 +44,6 @@ export default function LoginClient() {
       if (res.ok) {
           const next = search.get('next')
         const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
-        const pathname = usePathname ? usePathname() : undefined
         const currentPath = pathname || '/'
         // If login initiated from ATS or AI interview pages, do not redirect away; otherwise default to home
         const shouldStay = currentPath.startsWith('/ats') || currentPath.startsWith('/ai-interview')
