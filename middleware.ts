@@ -92,7 +92,6 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/admin') ||
     pathname.startsWith('/templates') ||
-    pathname.startsWith('/ai-interview') ||
     pathname.startsWith('/ats') ||
     pathname.startsWith('/intelligent-agent') ||
     pathname.startsWith('/rl-agent')
