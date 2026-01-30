@@ -42,16 +42,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       if (ready) {
         if (isReloadingRef.current) return
         isReloadingRef.current = true
-        console.debug('auth-gate: server confirmed auth after auth-changed, refreshing router and updating state')
+        console.debug('auth-gate: server confirmed auth after auth-changed; updating state without reload')
         try {
-          if (typeof window !== 'undefined' && window.localStorage) {
-            try { window.localStorage.setItem('authReloaded', '1') } catch (e) {}
-          }
           setServerAuth(true)
-          // Trigger server-side revalidation/data fetch without a full page reload
-          router.refresh()
+          // Notify other components to refresh their local state as needed
+          try { window.dispatchEvent(new Event('auth-changed')) } catch (e) {}
         } finally {
-          // leave isReloadingRef set to avoid further reloads
+          // leave isReloadingRef set to avoid repeated handling
         }
       } else {
         console.debug('auth-gate: server auth not yet available after auth-changed; starting background poll')
@@ -68,15 +65,12 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             clearInterval(interval)
             if (isReloadingRef.current) return
             isReloadingRef.current = true
-            console.debug('auth-gate: server confirmed auth during background poll, refreshing router and updating state')
+            console.debug('auth-gate: server confirmed auth during background poll; updating state without reload')
             try {
-              if (typeof window !== 'undefined' && window.localStorage) {
-                try { window.localStorage.setItem('authReloaded', '1') } catch (e) {}
-              }
               setServerAuth(true)
-              router.refresh()
+              try { window.dispatchEvent(new Event('auth-changed')) } catch (e) {}
             } finally {
-              // leave isReloadingRef set to avoid further reloads
+              // leave isReloadingRef set to avoid repeated handling
             }
           }
           if (elapsed >= 15000) {
@@ -114,15 +108,12 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           try { if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem('authPending') } catch (e) {}
           if (isReloadingRef.current) return
           isReloadingRef.current = true
-          console.debug('auth-gate: server auth detected during modal poll, refreshing router and updating state')
+          console.debug('auth-gate: server auth detected during modal poll; updating state without reload')
           try {
-            if (typeof window !== 'undefined' && window.localStorage) {
-              try { window.localStorage.setItem('authReloaded', '1') } catch (e) {}
-            }
             setServerAuth(true)
-            router.refresh()
+            try { window.dispatchEvent(new Event('auth-changed')) } catch (e) {}
           } finally {
-            // leave isReloadingRef set to avoid further reloads
+            // leave isReloadingRef set to avoid repeated handling
           }
           return
         }
@@ -195,7 +186,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
               <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-600 to-sky-600 text-white text-lg font-bold">A</div>
               <div className="flex-1">
                 <h2 id="auth-modal-title" className="mb-1 text-2xl font-semibold">Sign in to continue to <span className="text-emerald-600">AI²SARS</span></h2>
-                <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">To keep your data private and provide a personalized experience, you must sign in or create an account. After signing in the page will reload automatically.</p>
+                <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">To keep your data private and provide a personalized experience, you must sign in or create an account. After signing in you will be redirected and the UI will update automatically.</p>
               </div>
             </div>
 

@@ -88,13 +88,11 @@ export default function LoginClient() {
             setMsg('Sign in succeeded. Finalizing session—if you are not redirected automatically, please refresh.')
             console.debug('login-client: auth readiness check failed; forcing auth-changed and navigation')
 
-            // Navigate first to ensure the header/home receives the event; always go to home per request.
-            try { if (typeof window !== 'undefined' && window.localStorage) { try { window.localStorage.setItem('authReloaded', '1') } catch (e) {} } } catch (e) {}
+            // Navigate first to ensure the header/home receives the event. No reloads are performed — UI updates via events.
             await router.replace('/')
             try {
               if (typeof window !== 'undefined' && window.localStorage) {
                 try { window.localStorage.removeItem('reloadCount') } catch (e) {}
-                try { window.localStorage.removeItem('authReloaded') } catch (e) {}
                 window.localStorage.setItem('authPending', String(Date.now()))
               }
             } catch (e) {}
@@ -109,12 +107,10 @@ export default function LoginClient() {
 
           // Auth is confirmed; notify UI and navigate
           console.debug('login-client: auth confirmed, navigating to home then dispatching auth-changed')
-          // Navigate first to ensure the header/home receives the event; always go to home per request.
-          try { if (typeof window !== 'undefined' && window.localStorage) { try { window.localStorage.setItem('authReloaded', '1') } catch (e) {} } } catch (e) {}
+          // Navigate first to ensure the header/home receives the event. No reloads are performed — UI updates via events.
           await router.replace('/')
           try {
             if (typeof window !== 'undefined' && window.localStorage) {
-              try { window.localStorage.removeItem('authReloaded') } catch (e) {}
               // Clear any pending auth marker
               window.localStorage.removeItem('authPending')
             }

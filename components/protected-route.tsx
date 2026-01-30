@@ -65,23 +65,18 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     // On successful login (auth-changed), perform up to two reloads to ensure session hydration is available.
   useEffect(() => {
     function handleAuthChanged() {
-      if (typeof window === 'undefined' || !window.localStorage) return
-      const reloaded = window.localStorage.getItem('authReloaded')
-      console.debug('protected-route: auth-changed received, authReloaded=', reloaded)
-      if (reloaded === '1') {
-        // Another component already triggered the refresh; clear the marker and skip
-        try { window.localStorage.removeItem('authReloaded') } catch (e) {}
-        return
-      }
-      // First refresh: mark and perform a soft refresh to hydrate session-dependent data
-      try { window.localStorage.setItem('authReloaded', '1') } catch (e) {}
-      console.debug('protected-route: refreshing router to ensure session hydration')
-      router.refresh()
+      // On auth change, re-check server access and update local state without a full reload.
+      fetchWithAuth('/api/resumes')
+        .then(r => {
+          if (r.ok) setIsChecking(false)
+          else router.push(`/auth/login?next=${encodeURIComponent(pathname)}`)
+        })
+        .catch(() => router.push(`/auth/login?next=${encodeURIComponent(pathname)}`))
     }
 
     window.addEventListener('auth-changed', handleAuthChanged)
     return () => window.removeEventListener('auth-changed', handleAuthChanged)
-  }, [router])
+  }, [router, pathname])
 
   if (status === 'loading' || isChecking) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   return <>{children}</>
