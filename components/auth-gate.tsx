@@ -1,33 +1,55 @@
 "use client"
 
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { usePathname, useRouter } from 'next/navigation'
+import { fetchWithAuth } from '@/lib/clientAuth'
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const { status } = useSession()
   const pathname = usePathname() || ''
   const router = useRouter()
   const modalRef = useRef<HTMLDivElement | null>(null)
+  const [serverAuth, setServerAuth] = useState<boolean | null>(null)
+
+  const checkServerAuth = useCallback(async () => {
+    try {
+      const ok = await fetchWithAuth('/api/resumes').then(r => r.ok).catch(() => false)
+      setServerAuth(ok)
+      return ok
+    } catch (e) {
+      setServerAuth(false)
+      return false
+    }
+  }, [])
 
   // Reload when login completes (client code dispatches this event after login)
   useEffect(() => {
-    function handleAuthChanged() {
-      // Hard reload to ensure server session cookies are read
-      window.location.replace(window.location.href)
+    async function handleAuthChanged() {
+      // Re-check server auth; if ready, hide modal and reload the page
+      const ready = await checkServerAuth()
+      if (ready) {
+        // Hard reload to ensure server session cookies are read
+        window.location.replace(window.location.href)
+      }
     }
     window.addEventListener('auth-changed', handleAuthChanged)
     return () => window.removeEventListener('auth-changed', handleAuthChanged)
-  }, [])
+  }, [checkServerAuth])
+
+  // On mount, check server auth once so we don't rely only on next-auth status
+  useEffect(() => {
+    checkServerAuth()
+  }, [checkServerAuth])
 
   // Focus the modal so keyboard users can't interact with background
   useEffect(() => {
     if (modalRef.current) modalRef.current.focus()
-  }, [status])
+  }, [status, serverAuth])
 
   // Prevent body scroll while modal is open
   useEffect(() => {
-    const showModal = status !== 'authenticated' && !pathname.startsWith('/auth')
+    const showModal = !(status === 'authenticated' || serverAuth === true) && !pathname.startsWith('/auth')
     if (showModal) {
       const previous = document.body.style.overflow
       document.body.style.overflow = 'hidden'
@@ -36,10 +58,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       }
     }
     return
-  }, [status, pathname])
+  }, [status, pathname, serverAuth])
 
   // Show overlay on every page for unauthenticated users, but allow /auth/* pages
-  const showModal = status !== 'authenticated' && !pathname.startsWith('/auth')
+  const showModal = !(status === 'authenticated' || serverAuth === true) && !pathname.startsWith('/auth')
 
   return (
     <>
@@ -85,6 +107,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 Create account
               </button>
             </div>
+
+            {serverAuth === false && (
+              <div className="mt-4 text-sm text-slate-600">If you recently signed in and this message remains, try refreshing the page or signing in again.</div>
+            )}
           </div>
         </div>
       )}
