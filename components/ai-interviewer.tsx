@@ -1822,21 +1822,7 @@ export function AIInterviewer() {
                 </div>
               </div>
 
-              {cameraError && (
-                <div className="text-xs text-red-600 bg-red-50 p-3 rounded flex items-center justify-between gap-2">
-                  <span>{cameraError}</span>
-                  <button
-                    onClick={() => {
-                      setCameraError(null)
-                      setCameraPermissionDenied(false)
-                      requestCamera()
-                    }}
-                    className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
+              {cameraError && <div className="text-xs text-red-600 bg-red-50 p-2 rounded">{cameraError}</div>}
             </CardContent>
           </Card>
         </div>
