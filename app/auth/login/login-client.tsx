@@ -46,6 +46,25 @@ export default function LoginClient() {
 
         const next = search.get('next')
         const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
+        // Temporary debug fallback: when running with NEXT_PUBLIC_DEBUG_SET_TOKEN_COOKIE=true
+        // some hosting environments may prevent the HttpOnly cookie from being set correctly.
+        // If enabled, and no `token` cookie exists, set a non-HttpOnly `token` cookie from
+        // the returned token so client requests can proceed while we diagnose server cookie behavior.
+        try {
+          const debugEnabled = process.env.NEXT_PUBLIC_DEBUG_SET_TOKEN_COOKIE === 'true'
+          if (typeof window !== 'undefined' && debugEnabled) {
+            const hasTokenCookie = document.cookie.split('; ').some(c => c.startsWith('token='))
+            if (!hasTokenCookie && data?.token) {
+              const maxAge = 60 * 60 * 24 * 30
+              document.cookie = `token=${encodeURIComponent(data.token)}; path=/; max-age=${maxAge}`
+              // eslint-disable-next-line no-console
+              console.warn('DEBUG: set non-HttpOnly token cookie for troubleshooting')
+            }
+          }
+        } catch (err) {
+          // ignore
+        }
+
         router.replace(safeNext || '/')
       } else {
         setMsg(data.error || 'Login failed')

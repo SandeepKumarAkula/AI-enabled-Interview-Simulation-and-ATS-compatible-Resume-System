@@ -24,7 +24,24 @@ async function ensureCsrfToken() {
 
   if (!csrfBootstrapPromise) {
     csrfBootstrapPromise = fetch('/api/csrf', { credentials: 'include' })
-      .then(() => undefined)
+      .then(async (res) => {
+        // Try to read cookie set by the server. If it wasn't stored (some hosts/browsers),
+        // fall back to reading token from JSON body and write it into document.cookie
+        try {
+          const after = getCookieValue('csrfToken')
+          if (!after && res.ok) {
+            const data = await res.json().catch(() => null)
+            const token = data?.csrfToken
+            if (token && typeof document !== 'undefined') {
+              const secure = location.protocol === 'https:' ? '; Secure' : ''
+              // Set cookie with same attributes as server-side (lax, path=/, 24h)
+              document.cookie = `csrfToken=${encodeURIComponent(token)}; Path=/; Max-Age=${60 * 60 * 24}; SameSite=Lax${secure}`
+            }
+          }
+        } catch (e) {
+          // swallow - best effort fallback
+        }
+      })
       .finally(() => {
         csrfBootstrapPromise = null
       })
