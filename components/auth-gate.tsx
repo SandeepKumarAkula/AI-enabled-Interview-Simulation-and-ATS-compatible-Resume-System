@@ -11,6 +11,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const modalRef = useRef<HTMLDivElement | null>(null)
   const [serverAuth, setServerAuth] = useState<boolean | null>(null)
+  const isReloadingRef = React.useRef(false)
 
   const checkServerAuth = useCallback(async () => {
     try {
@@ -39,6 +40,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       // Re-check server auth with retries; if ready, hide modal and reload the page
       const ready = await checkWithRetries(8, 500)
       if (ready) {
+        if (isReloadingRef.current) return
+        isReloadingRef.current = true
         console.debug('auth-gate: server confirmed auth after auth-changed, reloading')
         window.location.replace(window.location.href)
       } else {
@@ -46,10 +49,16 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         // Start background poll that checks every 1s up to 15s
         let elapsed = 0
         const interval = setInterval(async () => {
+          if (isReloadingRef.current) {
+            clearInterval(interval)
+            return
+          }
           elapsed += 1000
           const ok = await checkServerAuth()
           if (ok) {
             clearInterval(interval)
+            if (isReloadingRef.current) return
+            isReloadingRef.current = true
             console.debug('auth-gate: server confirmed auth during background poll, reloading')
             window.location.replace(window.location.href)
           }
@@ -86,6 +95,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         if (ok) {
           // Clear pending marker if present
           try { if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem('authPending') } catch (e) {}
+          if (isReloadingRef.current) return
+          isReloadingRef.current = true
           console.debug('auth-gate: server auth detected during modal poll, reloading')
           window.location.replace(window.location.href)
           return
