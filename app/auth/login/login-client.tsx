@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,7 @@ export default function LoginClient() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const search = useSearchParams()
+  const pathname = usePathname()
 
   // If already logged in, redirect away.
   useEffect(() => {
@@ -43,6 +44,11 @@ export default function LoginClient() {
       if (res.ok) {
           const next = search.get('next')
         const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
+        const pathname = usePathname ? usePathname() : undefined
+        const currentPath = pathname || '/'
+        // If login initiated from ATS or AI interview pages, do not redirect away; otherwise default to home
+        const shouldStay = currentPath.startsWith('/ats') || currentPath.startsWith('/ai-interview')
+        const defaultTarget = shouldStay ? currentPath : '/'
 
         // Temporary debug fallback for environments that don't set HttpOnly cookie
         try {
@@ -83,8 +89,8 @@ export default function LoginClient() {
             setMsg('Sign in succeeded. Finalizing session—if you are not redirected automatically, please refresh.')
             console.debug('login-client: auth readiness check failed; forcing auth-changed and navigation')
 
-            // Navigate first to ensure the header/home receives the event when present.
-            await router.replace(safeNext || '/')
+            // Navigate first to ensure the header/home or current page receives the event when present.
+            await router.replace(safeNext || defaultTarget)
             try {
               if (typeof window !== 'undefined' && window.localStorage) {
                 try { window.localStorage.removeItem('reloadCount') } catch (e) {}
@@ -93,7 +99,7 @@ export default function LoginClient() {
               }
             } catch (e) {}
 
-            // Dispatch event so AuthGate will aggressively re-check server auth
+            // Dispatch event so other components can react to the new session
             setTimeout(() => window.dispatchEvent(new Event('auth-changed')), 100)
 
             // Ensure spinner clears so user can interact.
@@ -103,8 +109,8 @@ export default function LoginClient() {
 
           // Auth is confirmed; notify UI and navigate
           console.debug('login-client: auth confirmed, navigating to home then dispatching auth-changed')
-          // Navigate first to ensure the header/home receives the event when present.
-          await router.replace(safeNext || '/')
+          // Navigate first to ensure the header/home or current page receives the event when present.
+          await router.replace(safeNext || defaultTarget)
           try {
             if (typeof window !== 'undefined' && window.localStorage) {
               try { window.localStorage.removeItem('authReloaded') } catch (e) {}
