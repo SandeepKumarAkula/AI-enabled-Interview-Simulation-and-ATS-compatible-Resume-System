@@ -41,15 +41,10 @@ export default function LoginClient() {
       const data = await res.json()
 
       if (res.ok) {
-        // Tell header/nav to refresh its auth state.
-        window.dispatchEvent(new Event('auth-changed'))
-
-        const next = search.get('next')
+          const next = search.get('next')
         const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
-        // Temporary debug fallback: when running with NEXT_PUBLIC_DEBUG_SET_TOKEN_COOKIE=true
-        // some hosting environments may prevent the HttpOnly cookie from being set correctly.
-        // If enabled, and no `token` cookie exists, set a non-HttpOnly `token` cookie from
-        // the returned token so client requests can proceed while we diagnose server cookie behavior.
+
+        // Temporary debug fallback for environments that don't set HttpOnly cookie
         try {
           const debugEnabled = process.env.NEXT_PUBLIC_DEBUG_SET_TOKEN_COOKIE === 'true'
           if (typeof window !== 'undefined' && debugEnabled) {
@@ -65,10 +60,40 @@ export default function LoginClient() {
           // ignore
         }
 
+        // Wait for the server session/cookie to become effective before navigating.
+        // Poll `/api/resumes` (which requires auth) up to ~5 times with a short delay.
+        const waitForAuthReady = async (tries = 5, delayMs = 500) => {
+          for (let i = 0; i < tries; i++) {
+            try {
+              const ok = await fetchWithAuth('/api/resumes').then(r => r.ok).catch(() => false)
+              if (ok) return true
+            } catch (e) {
+              // ignore
+            }
+            await new Promise(res => setTimeout(res, delayMs))
+          }
+          return false
+        }
+
         try {
+          const ready = await waitForAuthReady(6, 500)
+          if (!ready) {
+            // If still not ready, show a helpful message and fallback to debug token if available
+            setMsg('Sign in succeeded, but server session not yet available. Please refresh if you are not redirected.')
+            // Ensure spinner clears so user can interact.
+            setLoading(false)
+            console.debug('login-client: auth readiness check failed after retries')
+            return
+          }
+
+          // Auth is confirmed; notify UI and navigate
+          console.debug('login-client: auth confirmed, dispatching auth-changed and navigating')
+          window.dispatchEvent(new Event('auth-changed'))
           router.replace(safeNext || '/')
+        } catch (e) {
+          console.error('Auth readiness check failed', e)
+          setMsg('Sign in succeeded but a follow-up check failed. Please refresh.')
         } finally {
-          // Ensure we don't leave the button stuck in loading state if navigation fails.
           setLoading(false)
         }
       } else {
