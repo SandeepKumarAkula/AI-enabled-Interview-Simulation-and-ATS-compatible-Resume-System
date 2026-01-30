@@ -3,12 +3,34 @@ import IORedis from 'ioredis'
 import { prisma } from '@/lib/prisma'
 import { uploadObject, getObjectUrl } from '@/lib/s3'
 
-const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379')
+const redisUrl = process.env.REDIS_URL || ''
 
-export const videoQueue = new Queue('video-processing', { connection })
+let connection: IORedis | null = null
+let _videoQueue: any = null
+
+if (redisUrl) {
+  connection = new IORedis(redisUrl)
+  _videoQueue = new Queue('video-processing', { connection })
+} else {
+  console.warn('REDIS_URL not set — BullMQ disabled. Background jobs will be no-op.')
+  // minimal stub so callers can call `videoQueue.add(...)` without crashing
+  _videoQueue = {
+    add: async (_name: string, _data: any) => {
+      console.warn('videoQueue.add called but REDIS_URL is not configured — skipping job enqueue')
+      return Promise.resolve({ id: 'no-redis' })
+    }
+  }
+}
+
+export const videoQueue = _videoQueue as unknown as Queue
 
 // Worker scaffold: in production run this file with ts-node to process jobs
 export const startWorker = () => {
+  if (!connection) {
+    console.warn('startWorker called but REDIS_URL not configured — worker not started')
+    return null
+  }
+
   const worker = new Worker(
     'video-processing',
     async (job) => {
@@ -52,7 +74,7 @@ export const startWorker = () => {
         throw err
       }
     },
-    { connection }
+    { connection: connection as any }
   )
 
   worker.on('failed', (job, err) => console.error('job failed', job?.id, err))
