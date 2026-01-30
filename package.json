@@ -7,6 +7,7 @@
     "dev": "next dev",
     "lint": "eslint .",
     "start": "next start",
+    "start:render": "bash -lc \"mkdir -p /tmp/prisma && cp prisma/dev.db /tmp/prisma/dev.db || true && export DATABASE_URL=file:/tmp/prisma/dev.db && npx prisma generate && npm run prisma:seed && npm run start\"",
     "electron-dev": "electron public/electron.js",
     "electron-build": "npm run build && electron-builder",
     "desktop": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && npm run electron-dev\"",
