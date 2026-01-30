@@ -65,7 +65,12 @@ export default function LoginClient() {
           // ignore
         }
 
-        router.replace(safeNext || '/')
+        try {
+          router.replace(safeNext || '/')
+        } finally {
+          // Ensure we don't leave the button stuck in loading state if navigation fails.
+          setLoading(false)
+        }
       } else {
         setMsg(data.error || 'Login failed')
         setLoading(false)

@@ -5,20 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { fetchWithAuth } from '@/lib/clientAuth'
 
-// Force reload twice after login to work around session hydration issues
-function useDoubleReload() {
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const reloadCount = parseInt(window.localStorage.getItem('reloadCount') || '0', 10)
-      if (reloadCount < 2) {
-        window.localStorage.setItem('reloadCount', String(reloadCount + 1))
-        window.location.reload()
-      } else {
-        window.localStorage.removeItem('reloadCount')
-      }
-    }
-  }, [])
-}
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [isChecking, setIsChecking] = useState(true)
@@ -42,17 +28,22 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
       })
       .catch(() => router.push('/auth/login'))
   }, [status, router])
-    // Reload-once workaround for session hydration issues
+    // On successful login (auth-changed), perform up to two reloads to ensure session hydration is available.
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const hasReloaded = window.localStorage.getItem('hasReloaded')
-      if (!hasReloaded) {
-        window.localStorage.setItem('hasReloaded', 'true')
+    function handleAuthChanged() {
+      if (typeof window === 'undefined' || !window.localStorage) return
+      const reloadCount = parseInt(window.localStorage.getItem('reloadCount') || '0', 10)
+      if (reloadCount < 2) {
+        window.localStorage.setItem('reloadCount', String(reloadCount + 1))
         window.location.reload()
+      } else {
+        window.localStorage.removeItem('reloadCount')
       }
     }
+
+    window.addEventListener('auth-changed', handleAuthChanged)
+    return () => window.removeEventListener('auth-changed', handleAuthChanged)
   }, [])
-  useDoubleReload()
 
   if (status === 'loading' || isChecking) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   return <>{children}</>
