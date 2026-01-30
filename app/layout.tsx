@@ -8,6 +8,7 @@ import Footer from "@/components/footer"
 import { ToastProvider } from "@/components/toast"
 import { LoadingProvider } from "@/components/global-loading-provider"
 import { ConfirmProvider } from "@/components/confirm"
+import AuthSessionProvider from "@/components/auth-session-provider"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -31,10 +32,12 @@ export default function RootLayout({
         <ToastProvider>
           <ConfirmProvider>
             <LoadingProvider>
-              <Header />
-              {children}
-              <Footer />
-              {process.env.NODE_ENV === 'production' ? <Analytics /> : null}
+              <AuthSessionProvider>
+                <Header />
+                {children}
+                <Footer />
+                {process.env.NODE_ENV === 'production' ? <Analytics /> : null}
+              </AuthSessionProvider>
             </LoadingProvider>
           </ConfirmProvider>
         </ToastProvider>
