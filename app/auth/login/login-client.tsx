@@ -87,7 +87,8 @@ export default function LoginClient() {
             await router.replace(safeNext || '/')
             try {
               if (typeof window !== 'undefined' && window.localStorage) {
-                window.localStorage.setItem('reloadCount', '0')
+                try { window.localStorage.removeItem('reloadCount') } catch (e) {}
+                try { window.localStorage.removeItem('authReloaded') } catch (e) {}
                 window.localStorage.setItem('authPending', String(Date.now()))
               }
             } catch (e) {}
@@ -106,7 +107,7 @@ export default function LoginClient() {
           await router.replace(safeNext || '/')
           try {
             if (typeof window !== 'undefined' && window.localStorage) {
-              window.localStorage.setItem('reloadCount', '0')
+              try { window.localStorage.removeItem('authReloaded') } catch (e) {}
               // Clear any pending auth marker
               window.localStorage.removeItem('authPending')
             }
