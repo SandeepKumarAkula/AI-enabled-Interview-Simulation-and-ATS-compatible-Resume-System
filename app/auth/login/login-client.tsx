@@ -94,45 +94,27 @@ export default function LoginClient() {
 
         try {
           const ready = await waitForAuthReady(6, 500)
-          if (!ready) {
-            // If still not ready, we still treat login as successful and trigger a site-wide re-check.
-            // This avoids leaving the mandatory modal visible when the session becomes available shortly.
-            setMsg('Sign in succeeded. Finalizing session—if you are not redirected automatically, please refresh.')
-            console.debug('login-client: auth readiness check failed; forcing auth-changed and navigation')
-
-            // Mark that we've just logged in and navigate to home while UI updates via events.
-            try { if (typeof window !== 'undefined' && window.localStorage) { try { window.localStorage.setItem('justLoggedIn', String(Date.now())) } catch (e) {} } } catch (e) {}
-            await router.replace(safeNext || '/')
+          // Auth is confirmed; use hard redirect for reliability in production
+          console.debug('login-client: auth confirmed, performing hard redirect to', safeNext || '/')
+          
+          const redirectUrl = safeNext || '/'
+          if (typeof window !== 'undefined') {
             try {
-              if (typeof window !== 'undefined' && window.localStorage) {
-                try { window.localStorage.removeItem('reloadCount') } catch (e) {}
-                window.localStorage.setItem('authPending', String(Date.now()))
+              if (window.localStorage) {
+                window.localStorage.setItem('justLoggedIn', String(Date.now()))
+                window.localStorage.removeItem('authPending')
               }
-            } catch (e) {}
-
-            // Dispatch event so other components can react to the new session
-            setTimeout(() => window.dispatchEvent(new Event('auth-changed')), 100)
-
-            // Ensure spinner clears so user can interact.
-            setLoading(false)
-            return
-          }
-
-          // Auth is confirmed; notify UI and navigate
-          console.debug('login-client: auth confirmed, navigating then dispatching auth-changed')
-          // Navigate first to ensure the header/original protected page receives the event.
-          try { if (typeof window !== 'undefined' && window.localStorage) { try { window.localStorage.setItem('justLoggedIn', String(Date.now())) } catch (e) {} } } catch (e) {}
-          await router.replace(safeNext || '/')
-          try {
-            if (typeof window !== 'undefined' && window.localStorage) {
-              // Clear any pending auth marker
-              window.localStorage.removeItem('authPending')
+            } catch (e) {
+              // ignore
             }
-          } catch (e) {}
-          // Wait for route change then dispatch auth-changed to trigger gate refresh
-          setTimeout(() => {
-            window.dispatchEvent(new Event('auth-changed'))
-          }, 500)
+            // Hard reload to ensure new cookie is picked up by layout
+            window.location.href = redirectUrl
+          } else {
+            // Fallback for SSR
+            router.replace(redirectUrl)
+          }
+          
+          setLoading(false)
         } catch (e) {
           console.error('Auth readiness check failed', e)
           setMsg('Sign in succeeded but a follow-up check failed. Please refresh.')
