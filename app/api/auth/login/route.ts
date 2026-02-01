@@ -20,8 +20,8 @@ export async function POST(req: Request) {
     const match = await bcrypt.compare(password, user.hashedPassword)
     if (!match) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
 
-    // prevent login if email not verified
-    if (!user.emailVerified) {
+    // prevent login if email not verified (admin bypass)
+    if (!user.emailVerified && user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Email not verified. Please check your inbox.' }, { status: 403 })
     }
 
