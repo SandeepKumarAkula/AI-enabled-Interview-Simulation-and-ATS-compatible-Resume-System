@@ -98,22 +98,26 @@ export function middleware(request: NextRequest) {
 
   if (isProtectedPage && !token) {
     // Log when protected page access has no token
-    try {
-      // eslint-disable-next-line no-console
-      console.debug('middleware: protected page access without token', { pathname })
-    } catch (e) {}
-    const url = request.nextUrl.clone()
-    url.pathname = '/auth/login'
-    url.searchParams.set('next', pathname + (search || ''))
-    return NextResponse.redirect(url)
+    console.debug('middleware: Redirecting to login - no token for protected page:', pathname)
+    const url = new URLSearchParams()
+    url.set('redirect', pathname + search)
+    return NextResponse.redirect(new URL(`/auth/login?${url.toString()}`, request.url))
+  }
+
+  // Clone response for header modifications
+  const response = NextResponse.next()
+
+  // Add no-cache headers to all protected pages to prevent back button access
+  if (isProtectedPage) {
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    response.headers.set('Pragma', 'no-cache')
+    response.headers.set('Expires', '0')
+    response.headers.set('Surrogate-Control', 'no-store')
   }
 
   // NOTE: Do not redirect away from auth screens based only on a token cookie.
   // A stale/invalid token cookie can otherwise cause redirect loops:
   // protected page -> /auth/login?next=... -> redirected back -> repeat.
-
-  // Create response with security headers
-  const response = NextResponse.next()
 
   // Security Headers
   // Prevents clickjacking attacks

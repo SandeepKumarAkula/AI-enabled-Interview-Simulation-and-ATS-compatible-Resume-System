@@ -20,15 +20,29 @@ export async function POST(req: Request) {
     const match = await bcrypt.compare(password, user.hashedPassword)
     if (!match) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
 
-    const token = jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, { expiresIn: '30d' })
+    // prevent login if email not verified
+    if (!user.emailVerified) {
+      return NextResponse.json({ error: 'Email not verified. Please check your inbox.' }, { status: 403 })
+    }
 
-    const res = NextResponse.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } })
+    const issuedAt = Math.floor(Date.now() / 1000)
+    const token = jwt.sign(
+      { sub: user.id, role: user.role, iat: issuedAt }, 
+      JWT_SECRET, 
+      { expiresIn: '1h' } // 1 hour session
+    )
+
+    const res = NextResponse.json({ 
+      token, 
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      sessionExpiry: issuedAt + 3600 // 1 hour from now in seconds
+    })
     // Set secure HttpOnly cookie
     res.cookies.set('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       path: '/',
-      maxAge: 60 * 60 * 24 * 30,
+      maxAge: 60 * 60, // 1 hour in seconds
       sameSite: 'lax'
     })
 

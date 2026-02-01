@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import validator from 'validator'
+import crypto from 'crypto'
+import { sendMail } from '@/lib/mailer'
 
 export async function POST(req: Request) {
   try {
@@ -25,6 +27,21 @@ export async function POST(req: Request) {
     const hashed = await bcrypt.hash(passwordStr, 10)
 
     const user = await prisma.user.create({ data: { email: String(email).toLowerCase(), name: name || null, hashedPassword: hashed } })
+
+    // create a verification token (expires in 60 minutes)
+    const token = crypto.randomBytes(32).toString('hex')
+    const expires = new Date(Date.now() + 1000 * 60 * 60)
+    await prisma.verificationToken.create({ data: { identifier: String(email).toLowerCase(), token, expires } })
+
+    // send verification email (best-effort)
+    try {
+      const base = process.env.NEXTAUTH_URL || `http://localhost:3000`
+      const link = `${base}/auth/verify?token=${encodeURIComponent(token)}&email=${encodeURIComponent(String(email).toLowerCase())}`
+      const html = `<p>Hello ${name || ''},</p><p>Thanks for creating an account. Please verify your email by clicking the link below:</p><p><a href="${link}">Verify email</a></p><p>This link expires in 60 minutes.</p>`
+      await sendMail({ to: String(email), subject: 'Verify your email', html })
+    } catch (e) {
+      console.error('Failed to send verification email:', e)
+    }
 
     return NextResponse.json({ user: { id: user.id, email: user.email, name: user.name } })
   } catch (error: any) {

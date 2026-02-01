@@ -9,6 +9,7 @@ import { ToastProvider } from "@/components/toast"
 import { LoadingProvider } from "@/components/global-loading-provider"
 import { ConfirmProvider } from "@/components/confirm"
 import AuthSessionProvider from "@/components/auth-session-provider"
+import SessionTimeoutMonitor from "@/components/session-timeout-monitor"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -33,6 +34,7 @@ export default function RootLayout({
           <ConfirmProvider>
             <LoadingProvider>
               <AuthSessionProvider>
+                  <SessionTimeoutMonitor />
                   <Header />
                   {children}
                   <Footer />

@@ -90,6 +90,30 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     checkServerAuth()
   }, [checkServerAuth])
 
+  // Listen for browser back/forward navigation to revalidate auth
+  useEffect(() => {
+    const handlePopState = () => {
+      console.debug('auth-gate: popstate detected, revalidating auth')
+      checkServerAuth()
+    }
+    
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [checkServerAuth])
+
+  // Listen for page visibility changes to revalidate auth when user returns
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.debug('auth-gate: page became visible, revalidating auth')
+        checkServerAuth()
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [checkServerAuth])
+
   // While modal is visible, poll server periodically in case cookies are just being set
   useEffect(() => {
     let stop = false

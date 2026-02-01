@@ -14,6 +14,8 @@ export default function LoginClient() {
   const [password, setPassword] = useState('')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showResend, setShowResend] = useState(false)
+  const [resending, setResending] = useState(false)
   const router = useRouter()
   const search = useSearchParams()
   const pathname = usePathname()
@@ -31,6 +33,7 @@ export default function LoginClient() {
     e.preventDefault()
     setLoading(true)
     setMsg('')
+    setShowResend(false)
 
     try {
       const res = await fetch('/api/auth/login', {
@@ -42,6 +45,15 @@ export default function LoginClient() {
       const data = await res.json()
 
       if (res.ok) {
+          // Store session expiry time for timeout monitoring
+          if (data.sessionExpiry && typeof window !== 'undefined' && window.localStorage) {
+            try {
+              window.localStorage.setItem('sessionExpiry', String(data.sessionExpiry))
+            } catch (e) {
+              console.error('Failed to store session expiry:', e)
+            }
+          }
+
           const next = search.get('next')
         const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
         const currentPath = pathname || '/'
@@ -126,13 +138,43 @@ export default function LoginClient() {
           setLoading(false)
         }
       } else {
-        setMsg(data.error || 'Login failed')
+        // Check if error is email not verified
+        if (res.status === 403 && data.error?.includes('not verified')) {
+          setMsg(data.error)
+          setShowResend(true)
+        } else {
+          setMsg(data.error || 'Login failed')
+          setShowResend(false)
+        }
         setLoading(false)
       }
     } catch (error: any) {
       console.error('Login error:', error)
       setMsg('Network error. Please try again.')
       setLoading(false)
+    }
+  }
+
+  async function resendVerification() {
+    if (!email) return
+    setResending(true)
+    try {
+      const res = await fetch('/api/auth/resend-verification', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ email }) 
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setMsg('✓ Verification email sent! Please check your inbox.')
+        setShowResend(false)
+      } else {
+        setMsg(data.error || 'Failed to resend')
+      }
+    } catch (e) {
+      setMsg('Network error')
+    } finally {
+      setResending(false)
     }
   }
 
@@ -176,6 +218,21 @@ export default function LoginClient() {
               />
             </div>
             {msg && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{msg}</div>}
+            {showResend && (
+              <Button
+                type="button"
+                onClick={resendVerification}
+                disabled={resending}
+                variant="outline"
+                className="w-full"
+              >
+                {resending ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Resending...</>
+                ) : (
+                  'Resend Verification Email'
+                )}
+              </Button>
+            )}
             <Button
               type="submit"
               disabled={loading}

@@ -41,8 +41,8 @@ export default function RegisterPage() {
       
       if (res.ok) {
         setSuccess(true)
-        setMsg('Account created successfully!')
-        setTimeout(() => router.push('/auth/login'), 2000)
+        setMsg('Account created! Please check your email to verify your account.')
+        setTimeout(() => router.push('/auth/login'), 3000)
       } else {
         setMsg(data.error || 'Registration failed')
         setLoading(false)

@@ -44,14 +44,31 @@ export default function Header() {
   }, [pathname])
 
   async function handleLogout() {
+    // Call logout API
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    
+    // Clear all client-side auth state
     try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem('authLoggedOut', String(Date.now()))
+      if (typeof window !== 'undefined') {
+        // Clear localStorage
+        if (window.localStorage) {
+          window.localStorage.setItem('authLoggedOut', String(Date.now()))
+          window.localStorage.removeItem('authPending')
+        }
+        // Clear sessionStorage
+        if (window.sessionStorage) {
+          window.sessionStorage.clear()
+        }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error('Error clearing storage:', e)
+    }
+    
+    // Dispatch auth change event
     window.dispatchEvent(new Event('auth-changed'))
-    router.replace('/auth/login')
+    
+    // Force hard navigation to login (not soft router push)
+    window.location.href = '/auth/login'
   }
 
   return (
