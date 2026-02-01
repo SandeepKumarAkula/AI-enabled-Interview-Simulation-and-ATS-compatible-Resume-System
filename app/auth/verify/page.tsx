@@ -1,11 +1,11 @@
 "use client"
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 
-export default function VerifyPage() {
+function VerifyContent() {
   const params = useSearchParams()
   const router = useRouter()
   const [status, setStatus] = useState<'idle'|'loading'|'success'|'error'>('idle')
@@ -120,5 +120,25 @@ export default function VerifyPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-white p-6 rounded shadow">
+            <h2 className="text-xl font-semibold mb-4">Email Verification</h2>
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <p>Loading...</p>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <VerifyContent />
+    </Suspense>
   )
 }
