@@ -100,7 +100,7 @@ export function middleware(request: NextRequest) {
     // Log when protected page access has no token
     console.debug('middleware: Redirecting to login - no token for protected page:', pathname)
     const url = new URLSearchParams()
-    url.set('redirect', pathname + search)
+    url.set('next', pathname + search)
     return NextResponse.redirect(new URL(`/auth/login?${url.toString()}`, request.url))
   }
 

@@ -54,7 +54,7 @@ export default function LoginClient() {
             }
           }
 
-          const next = search.get('next')
+          const next = search.get('next') || search.get('redirect')
         const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
         const currentPath = pathname || '/'
         // If login initiated from ATS or AI interview pages, do not redirect away; otherwise default to home
