@@ -10,6 +10,7 @@ export default function Header() {
   const [navTooltipVisible, setNavTooltipVisible] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
   const FULL_NAME = "AI-enabled Interview Simulation and ATS-compatible Resume System"
@@ -33,6 +34,7 @@ export default function Header() {
 
   useEffect(() => {
     refreshAuthState()
+    setMobileOpen(false)
 
     const handler = () => refreshAuthState()
     window.addEventListener('auth-changed', handler)
@@ -101,6 +103,20 @@ export default function Header() {
           </Link>
         </div>
 
+        <button
+          type="button"
+          className="md:hidden inline-flex items-center justify-center rounded-md border border-slate-200 p-2 text-slate-700 hover:bg-slate-50"
+          aria-label="Toggle menu"
+          aria-expanded={mobileOpen}
+          onClick={() => setMobileOpen((v) => !v)}
+        >
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+
         <nav className="hidden md:flex items-center gap-8">
           <Link href="/" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">Home</Link>
           <Link href="/#templates" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">Templates</Link>
@@ -125,6 +141,33 @@ export default function Header() {
           )}
         </nav>
       </div>
+
+      {mobileOpen && (
+        <div className="md:hidden border-t border-[#eaeaea] bg-white">
+          <div className="mx-auto max-w-7xl px-6 py-4 flex flex-col gap-3">
+            <Link href="/" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>Home</Link>
+            <Link href="/#templates" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>Templates</Link>
+            <Link href="/ai-interview" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>AI Interview</Link>
+            <Link href="/ats" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>Check ATS</Link>
+            {isLoggedIn && (
+              <>
+                <Link href="/dashboard/resumes" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>My Resumes</Link>
+                <Link href="/dashboard/interviews" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>My Interviews</Link>
+                {isAdmin && <Link href="/admin" className="text-green-600 hover:text-green-700 transition-colors text-sm font-semibold" onClick={() => setMobileOpen(false)}>Admin</Link>}
+              </>
+            )}
+            <Link href="/help" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>Help</Link>
+            {isLoggedIn ? (
+              <button onClick={handleLogout} className="text-left text-sm text-red-600 hover:text-red-700 transition-colors">Logout</button>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <Link href="/auth/login" className="text-sm text-green-600 hover:text-green-700 transition-colors font-medium" onClick={() => setMobileOpen(false)}>Login</Link>
+                <Link href="/auth/register" className="text-sm bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition-colors text-center" onClick={() => setMobileOpen(false)}>Sign Up</Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   )
 }
