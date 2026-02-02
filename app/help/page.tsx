@@ -150,7 +150,6 @@ export default function HelpPage() {
     </main>
   )
 }
-                <p className="text-sm text-gray-600">Start on the home page. Select a template from the gallery (ATS-friendly templates recommended) and click "Select Template". Fill in your details with real-time PDF preview on the right side.</p>
               </div>
             </div>
 
