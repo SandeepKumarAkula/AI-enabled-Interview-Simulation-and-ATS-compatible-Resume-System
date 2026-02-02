@@ -119,11 +119,7 @@ export default function Header() {
 
         <nav className="hidden md:flex items-center gap-6">
           <Link href="/" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">Home</Link>
-          <Link href="/features" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">Features</Link>
           <Link href="/#templates" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">Templates</Link>
-          <Link href="/pricing" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">Pricing</Link>
-          <Link href="/blog" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">Blog</Link>
-          <Link href="/docs" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">Docs</Link>
           <Link href="/ai-interview" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">AI Interview</Link>
           <Link href="/ats" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">Check ATS</Link>
           {/* ATS history removed */}
@@ -135,7 +131,6 @@ export default function Header() {
             </>
           )}
           <Link href="/help" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">Help</Link>
-          <Link href="/contact" className="text-[#666666] hover:text-[#222222] transition-colors text-sm">Contact</Link>
           {isLoggedIn ? (
             <button onClick={handleLogout} className="text-sm text-red-600 hover:text-red-700 transition-colors">Logout</button>
           ) : (
@@ -151,12 +146,7 @@ export default function Header() {
         <div className="md:hidden border-t border-[#eaeaea] bg-white">
           <div className="mx-auto max-w-7xl px-6 py-4 flex flex-col gap-3">
             <Link href="/" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>Home</Link>
-            <Link href="/features" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>Features</Link>
             <Link href="/#templates" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>Templates</Link>
-            <Link href="/pricing" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>Pricing</Link>
-            <Link href="/blog" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>Blog</Link>
-            <Link href="/docs" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>Docs</Link>
-            <Link href="/resources" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>Resources</Link>
             <Link href="/ai-interview" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>AI Interview</Link>
             <Link href="/ats" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>Check ATS</Link>
             {isLoggedIn && (
@@ -167,7 +157,6 @@ export default function Header() {
               </>
             )}
             <Link href="/help" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>Help</Link>
-            <Link href="/contact" className="text-[#666666] hover:text-[#222222] transition-colors text-sm" onClick={() => setMobileOpen(false)}>Contact</Link>
             <hr className="my-2 border-[#eaeaea]" />
             <div className="space-y-2 text-xs text-gray-600">
               <Link href="/privacy" className="hover:text-emerald-600 transition-colors" onClick={() => setMobileOpen(false)}>Privacy</Link>
