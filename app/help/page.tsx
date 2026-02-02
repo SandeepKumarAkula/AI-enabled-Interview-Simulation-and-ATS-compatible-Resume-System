@@ -150,54 +150,6 @@ export default function HelpPage() {
     </main>
   )
 }
-              <div className="flex items-start gap-3">
-                <Video className="w-6 h-6 text-emerald-600 flex-shrink-0 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Full-Screen Interview Mode</h3>
-                  <p className="text-sm text-gray-600 mt-1">Immersive interview experience with automatic fullscreen enforcement. 10-second exit timer if you leave fullscreen, automatic interview termination for security.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 border border-gray-200 rounded-lg hover:border-emerald-500 transition-colors">
-              <div className="flex items-start gap-3">
-                <Brain className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">AI-Powered Question Selection</h3>
-                  <p className="text-sm text-gray-600 mt-1">100+ questions across 9 roles, 5 types (Technical, Behavioral, Coding, System Design, Managerial), and 3 difficulty levels. Powered by Q-Learning agent that adapts to your performance.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 border border-gray-200 rounded-lg hover:border-emerald-500 transition-colors">
-              <div className="flex items-start gap-3">
-                <Zap className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Speech Recognition & Live Captions</h3>
-                  <p className="text-sm text-gray-600 mt-1">Real-time speech-to-text with live captions. No typing—pure voice interview experience like Google Meet.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 border border-gray-200 rounded-lg hover:border-emerald-500 transition-colors">
-              <div className="flex items-start gap-3">
-                <Shield className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Advanced Performance Scoring</h3>
-                  <p className="text-sm text-gray-600 mt-1">6-dimension scoring: Clarity, Technical Depth, Problem-Solving, Communication, Confidence, Body Language. Real-time video analysis included.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 border border-gray-200 rounded-lg hover:border-emerald-500 transition-colors">
-              <div className="flex items-start gap-3">
-                <Lightbulb className="w-6 h-6 text-purple-600 flex-shrink-0 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Intelligent Reports & Feedback</h3>
-                  <p className="text-sm text-gray-600 mt-1">PDF reports with role-specific recommendations, strengths analysis, and improvement areas. Interview Readiness Score & Job Fit %. Download reports instantly.</p>
-                </div>
-              </div>
-            </div>
           </div>
         </section>
 
