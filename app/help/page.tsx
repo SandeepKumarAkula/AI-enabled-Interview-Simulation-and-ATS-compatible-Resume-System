@@ -150,14 +150,6 @@ export default function HelpPage() {
     </main>
   )
 }
-          </div>
-        </section>
-
-        {/* Quick Start Guide */}
-        <section className="mb-12">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">Quick Start Guide</h2>
-          
-          <div className="space-y-4">
             <div className="flex gap-4">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">1</div>
