@@ -29,7 +29,7 @@ export default function Footer() {
             <h4 className="font-semibold text-[#222222] mb-4">Resources</h4>
             <ul className="space-y-2">
               <li><a href="#" className="text-sm text-[#666666] hover:text-[#2ecc71] transition-colors">Blog</a></li>
-              <li><a href="#" className="text-sm text-[#666666] hover:text-[#2ecc71] transition-colors">Help Center</a></li>
+              <li><a href="/help" className="text-sm text-[#666666] hover:text-[#2ecc71] transition-colors">Help Center</a></li>
               <li><a href="#" className="text-sm text-[#666666] hover:text-[#2ecc71] transition-colors">Contact</a></li>
             </ul>
           </div>
