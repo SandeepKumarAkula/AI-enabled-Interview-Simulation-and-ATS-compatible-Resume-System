@@ -150,8 +150,6 @@ export default function HelpPage() {
     </main>
   )
 }
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">Resume Builder</h3>
                 <p className="text-sm text-gray-600">Start on the home page. Select a template from the gallery (ATS-friendly templates recommended) and click "Select Template". Fill in your details with real-time PDF preview on the right side.</p>
               </div>
             </div>
