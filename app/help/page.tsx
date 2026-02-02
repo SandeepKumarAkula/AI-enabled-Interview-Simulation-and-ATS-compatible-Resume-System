@@ -150,54 +150,6 @@ export default function HelpPage() {
     </main>
   )
 }
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">2</div>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">Setup Interview</h3>
-                <p className="text-sm text-gray-600">Navigate to "AI Interview" from the header. Upload or paste your resume. Select job role, experience level, and interview types (Technical, Behavioral, Coding, System Design, Managerial).</p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">3</div>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">Test Camera & Audio</h3>
-                <p className="text-sm text-gray-600">Enable camera and test microphone by saying "I am ready for the interview". Both must show status before proceeding.</p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">4</div>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">Start Interview</h3>
-                <p className="text-sm text-gray-600">Click "Begin Interview". Screen enters fullscreen automatically. Interview duration is 15 minutes. Cannot navigate away—must complete or click "End Interview".</p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">5</div>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">Answer Questions</h3>
-                <p className="text-sm text-gray-600">Click microphone icon to answer. Speak your response. Live captions appear as you speak (like Google Meet). Click "Submit Answer" when done.</p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">6</div>
-              </div>
-              <div>
                 <h3 className="font-semibold text-gray-900 mb-1">Get Report</h3>
                 <p className="text-sm text-gray-600">After interview completes or time expires, comprehensive report shows with scores, strengths, improvements, and role match %. Download as PDF instantly.</p>
               </div>
