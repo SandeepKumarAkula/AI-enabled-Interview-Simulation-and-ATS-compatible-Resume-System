@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, CheckCircle } from 'lucide-react'
 import { PasswordStrength } from '@/components/password-strength'
+import { PasswordInput } from '@/components/password-input'
 import { fetchWithAuth } from '@/lib/clientAuth'
 
 export default function RegisterPage() {
@@ -99,15 +100,13 @@ export default function RegisterPage() {
               <label htmlFor="password" className="text-sm font-medium">
                 Password
               </label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                className="w-full"
               />
               <PasswordStrength password={password} />
             </div>

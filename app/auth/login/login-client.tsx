@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2 } from 'lucide-react'
+import { PasswordInput } from '@/components/password-input'
 import { fetchWithAuth } from '@/lib/clientAuth'
 
 export default function LoginClient() {
@@ -191,14 +192,12 @@ export default function LoginClient() {
               <label htmlFor="password" className="text-sm font-medium">
                 Password
               </label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full"
               />
             </div>
             {msg && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{msg}</div>}

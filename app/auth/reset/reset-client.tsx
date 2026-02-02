@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, CheckCircle, Key } from 'lucide-react'
 import { PasswordStrength } from '@/components/password-strength'
+import { PasswordInput } from '@/components/password-input'
 import { fetchWithAuth } from '@/lib/clientAuth'
 
 type TokenState =
@@ -154,15 +155,13 @@ export default function ResetClient() {
                 <label htmlFor="password" className="text-sm font-medium">
                   New Password
                 </label>
-                <Input
+                <PasswordInput
                   id="password"
-                  type="password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="w-full"
                 />
                 <PasswordStrength password={password} />
               </div>
@@ -170,15 +169,13 @@ export default function ResetClient() {
                 <label htmlFor="confirmPassword" className="text-sm font-medium">
                   Confirm Password
                 </label>
-                <Input
+                <PasswordInput
                   id="confirmPassword"
-                  type="password"
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="w-full"
                 />
               </div>
               {msg && (
