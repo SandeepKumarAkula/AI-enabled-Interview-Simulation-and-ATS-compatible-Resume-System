@@ -150,7 +150,7 @@ export default function HelpPage() {
     </main>
   )
 }
-                <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">1</div>
+
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900 mb-1">Resume Builder</h3>
