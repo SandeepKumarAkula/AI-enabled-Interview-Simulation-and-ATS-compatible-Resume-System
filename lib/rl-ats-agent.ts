@@ -422,11 +422,12 @@ export class AIAgentEngine {
       console.log(`[RL AGENT DEBUG] Safeguard triggered: Upgraded REJECT to CONSIDER due to high individual score`);
     }
     
-    // Emergency override: if exploration rate triggers, add randomness
-    if (this.rnd() < this.explorationRate) {
-      const actions = ['hire', 'reject', 'consider'] as const;
-      action = actions[Math.floor(this.rnd() * 3)];
-    }
+    // EXPLORATION DISABLED FOR PRODUCTION: Don't randomize decisions for single analysis
+    // Only use exploration during training, never during actual resume evaluation
+    // if (this.rnd() < this.explorationRate) {
+    //   const actions = ['hire', 'reject', 'consider'] as const;
+    //   action = actions[Math.floor(this.rnd() * 3)];
+    // }
     
     // ABSOLUTE FINAL CHECK: Ensure decision makes sense with confidence
     // This is a HARD GUARANTEE that prevents nonsensical outputs
@@ -439,20 +440,41 @@ export class AIAgentEngine {
        (features.leadershipScore / 100) * 7) / 1.2
     );
     
-    console.log(`[RL AGENT FINAL CHECK] ATS Score from features: ${atsScoreFromFeatures}, Decision: ${action}, Confidence: ${confidenceScore}`);
+    console.log(`[RL AGENT FINAL CHECK] Tech=${features.technicalScore}, Comm=${features.communicationScore}, Experience=${features.experienceYears}, ATS Score: ${atsScoreFromFeatures}, Decision: ${action}`);
     
-    // HARD OVERRIDE: If ATS score from features is high (>70), never REJECT
+    // CRITICAL SAFEGUARD #1: Feature-based overrides (most aggressive)
+    // If EITHER technicalScore OR communicationScore are STRONG (>70), never REJECT
+    if ((features.technicalScore > 70 || features.communicationScore > 70) && action === 'reject') {
+      console.log(`[RL AGENT OVERRIDE #1] Strong individual feature detected (Tech=${features.technicalScore}, Comm=${features.communicationScore}) - FORCING CONSIDER`);
+      action = 'consider';
+      confidenceScore = Math.max(0.60, (features.technicalScore + features.communicationScore) / 200);
+    }
+    
+    // CRITICAL SAFEGUARD #2: If ATS score from features is high (>70), never REJECT
     if (atsScoreFromFeatures >= 70 && action === 'reject') {
-      console.log(`[RL AGENT OVERRIDE] High ATS score (${atsScoreFromFeatures}) but REJECT action detected - FORCING HIRE`);
+      console.log(`[RL AGENT OVERRIDE #2] High ATS score (${atsScoreFromFeatures}) but REJECT detected - FORCING HIRE`);
       action = 'hire';
       confidenceScore = Math.min(1.0, atsScoreFromFeatures / 100);
     }
     
-    // HARD OVERRIDE: If ATS score is > 80, ALWAYS HIRE
+    // CRITICAL SAFEGUARD #3: If ATS score is > 80, ALWAYS HIRE
     if (atsScoreFromFeatures >= 80 && action !== 'hire') {
-      console.log(`[RL AGENT OVERRIDE] ATS score ${atsScoreFromFeatures} >= 80 - FORCING HIRE`);
+      console.log(`[RL AGENT OVERRIDE #3] ATS score ${atsScoreFromFeatures} >= 80 - FORCING HIRE`);
       action = 'hire';
       confidenceScore = Math.min(1.0, atsScoreFromFeatures / 100);
+    }
+    
+    // CRITICAL SAFEGUARD #4: Illogical combination prevention
+    // If any single feature is > 60 AND we have reasonable experience (>1 year), minimum CONSIDER
+    const hasStrongIndividualFeature = features.technicalScore > 60 || 
+                                       features.communicationScore > 60 || 
+                                       features.leadershipScore > 60;
+    const hasExperience = features.experienceYears > 1;
+    
+    if (hasStrongIndividualFeature && hasExperience && action === 'reject') {
+      console.log(`[RL AGENT OVERRIDE #4] Strong feature + experience present - FORCING CONSIDER`);
+      action = 'consider';
+      confidenceScore = Math.max(0.55, decisionScore);
     }
     
     
