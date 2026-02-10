@@ -16,9 +16,9 @@ let rlAgent: AIAgentEngine | null = null
 let intelligentAgent: IntelligentATSAgent | null = null
 
 const getAgents = () => {
-  if (!customAgent) customAgent = new CustomATSAgent(getCustomAgentConfig())
-  if (!rlAgent) rlAgent = new AIAgentEngine(getRLAgentConfig())
-  if (!intelligentAgent) intelligentAgent = new IntelligentATSAgent(getIntelligentAgentConfig())
+  if (!customAgent) customAgent = new CustomATSAgent()
+  if (!rlAgent) rlAgent = new AIAgentEngine()
+  if (!intelligentAgent) intelligentAgent = new IntelligentATSAgent()
   return { customAgent, rlAgent, intelligentAgent }
 }
 
@@ -1132,7 +1132,7 @@ export async function POST(request: NextRequest) {
     let customAgentAnalysis: any = { score: 50, reasoning: 'fallback', confidence: 0.5, factors: [] }
     try {
       const { customAgent: customAgentInstance } = getAgents()
-      customAgentAnalysis = customAgentInstance.analyzeResume(jobDescription || '', rlFeatures)
+      customAgentAnalysis = customAgentInstance.analyzeResume(jobDescription || '')
       customAgentAnalysis.score = customAgentAnalysis.confidence ? customAgentAnalysis.confidence * 100 : 50
     } catch (e) {
       console.error('Custom ATS agent failed:', e)

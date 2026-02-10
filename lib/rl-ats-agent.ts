@@ -322,121 +322,74 @@ export class AIAgentEngine {
   }
 
   /**
-   * Make hiring decision using ε-greedy policy + STRICT feature-based scoring
-   * Exploits best known action most of the time, explores randomly sometimes
+   * Make hiring decision using feature-based scoring (ground truth)
+   * Q-learning is too unreliable early; we use features as primary signal
    */
   makeDecision(features: ResumFeatures, jobDescription?: string): HiringDecision {
     const state = this.quantizeFeatures(features);
     const qValues = this.getQValues(state);
     
-    // MEDIUM DIFFICULTY - Balanced scoring from industry training data
-    // Normalized feature calculation (0-1 scale)
+    // CRITICAL: Calculate feature score based on ALL AVAILABLE DATA
+    // This is the GROUND TRUTH metric that should drive the decision
     
-    // Technical Score: Industry standard is 60+ for good match
-    const techScore = (features.technicalScore / 100) * 1.0;
+    // Normalize each feature to 0-1 scale
+    const techScore = Math.min(1.0, features.technicalScore / 100);
+    const expScore = Math.min(1.0, features.experienceYears / 8);
+    const eduScore = Math.min(1.0, features.educationLevel / 10) * 0.8;
+    const commScore = Math.min(1.0, features.communicationScore / 100) * 0.95;
+    const leadScore = Math.min(1.0, features.leadershipScore / 100) * 0.75;
+    const cultureScore = Math.min(1.0, features.cultureFitScore / 100) * 0.85;
     
-    // Experience: Most roles need 2-8 years, returns diminish beyond
-    const expScore = Math.min(features.experienceYears / 8, 1.0);
-    
-    // Education: Degree helpful but not critical in tech
-    const eduScore = (features.educationLevel / 10) * 0.8;
-    
-    // Communication: Very important, scale normally
-    const commScore = (features.communicationScore / 100) * 0.95;
-    
-    // Leadership: Valuable but not everyone needs it
-    const leadScore = (features.leadershipScore / 100) * 0.75;
-    
-    // Culture Fit: Important for long-term success
-    const cultureScore = (features.cultureFitScore / 100) * 0.85;
-    
-    // Weighted feature score - BALANCED from industry data
-    const featureScore = (
-      techScore * 0.28 +       // Technical is important
-      expScore * 0.20 +        // Experience matters
-      commScore * 0.18 +       // Communication critical
-      cultureScore * 0.15 +    // Culture fit important
-      eduScore * 0.12 +        // Education helpful
-      leadScore * 0.07         // Leadership bonus
+    // Comprehensive weighted score from industry standards
+    const baseFeatureScore = (
+      techScore * 0.28 +
+      expScore * 0.20 +
+      commScore * 0.18 +
+      cultureScore * 0.15 +
+      eduScore * 0.12 +
+      leadScore * 0.07
     );
     
-    // Apply MEDIUM penalty multipliers - not too harsh
+    // Apply ONLY harsh penalties for truly disqualifying factors
     let penaltyMultiplier = 1.0;
+    if (features.technicalScore < 20) penaltyMultiplier = 0.6; // Critically weak technical
+    else if (features.technicalScore < 35) penaltyMultiplier = 0.85; // Weak technical
     
-    // Soft penalties for weak areas
-    if (features.technicalScore < 30) penaltyMultiplier *= 0.8; // Weak technical
-    if (features.experienceYears < 1) penaltyMultiplier *= 0.85; // Very junior
-    if (features.communicationScore < 40) penaltyMultiplier *= 0.9; // Poor communication
+    if (features.communicationScore < 30) penaltyMultiplier *= 0.8; // Critically poor communication
     
-    const adjustedFeatureScore = Math.min(featureScore * penaltyMultiplier, 1.0);
+    const adjustedFeatureScore = Math.min(baseFeatureScore * penaltyMultiplier, 1.0);
     
-    // Blend Q-learning with feature-based score (MEDIUM difficulty)
-    const blendRatio = Math.min(this.totalDecisions / 50, 0.4); // Slower Q-learning integration
-    
-    // Ensure Q-values are valid numbers (0-1 range)
-    const safeQHire = Math.max(0, Math.min(1, qValues.hire || 0.5));
-    const safeQConsider = Math.max(0, Math.min(1, qValues.consider || 0.4));
-    const safeQReject = Math.max(0, Math.min(1, qValues.reject || 0.3));
-    
-    let hireScore = safeQHire * blendRatio + adjustedFeatureScore * (1 - blendRatio);
-    let considerScore = safeQConsider * blendRatio + (adjustedFeatureScore * 0.75) * (1 - blendRatio);
-    let rejectScore = safeQReject * blendRatio + ((1 - adjustedFeatureScore) * 0.6) * (1 - blendRatio);
-
-    // Apply global leniency synchronously (configured via ATS_LENIENCY_PERCENT)
-    try {
-      const lenMul = getLeniencyMultiplier();
-      hireScore = Math.min(1, hireScore * lenMul);
-      considerScore = Math.min(1, considerScore * lenMul);
-      // Slightly reduce reject score when leniency increases hires/considers
-      rejectScore = Math.min(1, rejectScore * (1 / Math.max(1, lenMul)));
-    } catch (e) {}
+    // CRITICAL: Make decision DIRECTLY from adjusted feature score
+    // This is what matters - not Q-table nonsense
+    // Q-values only used for optional learning history, not decisions
     
     let action: 'hire' | 'reject' | 'consider';
+    let confidenceScore: number;
     
-    // FIXED DECISION THRESHOLDS - Better alignment with feature scores
-    // High score (0.70+) = HIRE
-    // Medium score (0.40-0.70) = CONSIDER  
-    // Low score (<0.40) = REJECT
+    // Simple, clear decision logic based on resume quality
+    if (adjustedFeatureScore >= 0.72) {
+      // Excellent resume - HIRE
+      action = 'hire';
+      confidenceScore = Math.min(1.0, adjustedFeatureScore);
+    } else if (adjustedFeatureScore >= 0.50) {
+      // Good resume - CONSIDER
+      action = 'consider';
+      confidenceScore = adjustedFeatureScore * 0.9;
+    } else if (adjustedFeatureScore >= 0.30) {
+      // Weak but not terrible - CONSIDER (give chance)
+      action = 'consider';
+      confidenceScore = adjustedFeatureScore * 0.6;
+    } else {
+      // Very weak - REJECT
+      action = 'reject';
+      confidenceScore = Math.min(0.7, (1 - adjustedFeatureScore) * 0.8);
+    }
     
+    // Emergency override: if exploration rate triggers, add randomness
     if (this.rnd() < this.explorationRate) {
-      // Explore: random action (minimal for production stability)
       const actions = ['hire', 'reject', 'consider'] as const;
       action = actions[Math.floor(this.rnd() * 3)];
-    } else {
-      // Exploit with improved thresholds aligned to feature scores
-      const maxScore = Math.max(hireScore, considerScore, rejectScore);
-      
-      // Primary decision based on which score is highest AND meets minimum threshold
-      if (hireScore >= 0.65 && hireScore === maxScore) {
-        action = 'hire';
-      } else if (considerScore >= 0.45 && considerScore >= hireScore && considerScore > rejectScore) {
-        action = 'consider';
-      } else if (adjustedFeatureScore < 0.40) {
-        // Low feature score = reject
-        action = 'reject';
-      } else {
-        // Default: use feature score directly
-        action = (adjustedFeatureScore >= 0.65) ? 'hire' : (adjustedFeatureScore >= 0.45) ? 'consider' : 'reject';
-      }
     }
-    
-    // Calculate confidence score properly (0-1 normalized range)
-    // Confidence should reflect how confident we are in the decision, not just the score
-    let confidenceScore = 0;
-    let baseConfidence = 0;
-    
-    if (action === 'hire') {
-      baseConfidence = Math.min(1.0, Math.max(0, hireScore)); // Clamp to 0-1
-    } else if (action === 'consider') {
-      baseConfidence = Math.min(1.0, Math.max(0, considerScore)); // Clamp to 0-1
-    } else {
-      baseConfidence = Math.min(1.0, Math.max(0, rejectScore)); // Clamp to 0-1
-    }
-    
-    // Boost confidence for high feature scores
-    // If adjusted feature score is high, we should be more confident in our decision
-    const featureConfidenceBoost = Math.min(0.15, adjustedFeatureScore * 0.15);
-    confidenceScore = Math.min(1.0, baseConfidence + featureConfidenceBoost);
     
     const reasoning = this.generateReasoning(features, action, jobDescription);
     
