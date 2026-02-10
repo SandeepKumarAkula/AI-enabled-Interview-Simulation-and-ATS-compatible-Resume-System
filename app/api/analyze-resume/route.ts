@@ -1353,31 +1353,32 @@ export async function POST(request: NextRequest) {
       ? Math.round((metricLinesForScoring.length / bulletLinesForScoring.length) * 100)
       : 30
 
-    // NON-LINEAR experience scoring for better differentiation
+    // NON-LINEAR experience scoring - INDUSTRY ALIGNED (higher baseline)
     let experienceScore = 0
-    if (experienceYears === 0 || experienceYears < 0.5) experienceScore = 15
-    else if (experienceYears < 1) experienceScore = 30
-    else if (experienceYears < 2) experienceScore = 50
-    else if (experienceYears < 3) experienceScore = 65
-    else if (experienceYears < 5) experienceScore = 75
-    else if (experienceYears < 8) experienceScore = 85
-    else if (experienceYears < 12) experienceScore = 92
+    if (experienceYears === 0 || experienceYears < 0.5) experienceScore = 40  // Raised from 15
+    else if (experienceYears < 1) experienceScore = 55  // Raised from 30
+    else if (experienceYears < 2) experienceScore = 68  // Raised from 50
+    else if (experienceYears < 3) experienceScore = 75  // Raised from 65
+    else if (experienceYears < 5) experienceScore = 82  // Raised from 75
+    else if (experienceYears < 8) experienceScore = 88  // Raised from 85
+    else if (experienceYears < 12) experienceScore = 94  // Raised from 92
     else experienceScore = 98
 
-    // SKILLS QUALITY scoring (not just count) - depth over breadth
+    // SKILLS QUALITY scoring - INDUSTRY ALIGNED (more generous)
     let skillsScore = 0
     if (jobSkills.length > 0) {
       // Job-specific match percentage + bonus for demonstrating depth
-      const depthBonus = matchedSkills.length > 5 ? 10 : matchedSkills.length > 3 ? 5 : 0
-      skillsScore = Math.min(100, skillMatchPercentage + depthBonus)
+      const baseMatch = Math.max(50, skillMatchPercentage)  // Floor at 50 for any skills presence
+      const depthBonus = matchedSkills.length > 5 ? 15 : matchedSkills.length > 3 ? 10 : 5
+      skillsScore = Math.min(100, baseMatch + depthBonus)
     } else {
-      // No job description: reward depth (5+ skills good, 10+ excellent, 15+ exceptional)
-      if (detectedSkills.length < 3) skillsScore = 20
-      else if (detectedSkills.length < 5) skillsScore = 40
-      else if (detectedSkills.length < 8) skillsScore = 60
-      else if (detectedSkills.length < 12) skillsScore = 75
-      else if (detectedSkills.length < 18) skillsScore = 88
-      else skillsScore = 95
+      // No job description: reward depth (industry standard is generous here)
+      if (detectedSkills.length < 3) skillsScore = 45  // Raised from 20
+      else if (detectedSkills.length < 5) skillsScore = 60  // Raised from 40
+      else if (detectedSkills.length < 8) skillsScore = 72  // Raised from 60
+      else if (detectedSkills.length < 12) skillsScore = 82  // Raised from 75
+      else if (detectedSkills.length < 18) skillsScore = 91  // Raised from 88
+      else skillsScore = 96  // Raised from 95
     }
 
     // ROLE LEVEL detection for adaptive weighting
@@ -1385,30 +1386,31 @@ export async function POST(request: NextRequest) {
     const juniorKeywords = (resume.match(/intern|junior|entry.level|associate|assistant|trainee/gi) || []).length
     const roleLevel = seniorKeywords > juniorKeywords ? 'senior' : juniorKeywords > 1 ? 'junior' : 'mid'
 
-    // LENGTH normalization (too short = incomplete, too long = unfocused)
+    // LENGTH normalization - INDUSTRY ALIGNED (less harsh penalties)
     const wordCount = resume.split(/\s+/).length
     let lengthScore = 100
-    if (wordCount < 150) lengthScore = 40  // Way too short
-    else if (wordCount < 250) lengthScore = 60  // Too brief
-    else if (wordCount < 400) lengthScore = 85  // Good for junior
-    else if (wordCount < 800) lengthScore = 100 // Ideal range
-    else if (wordCount < 1200) lengthScore = 95 // Slightly long
-    else if (wordCount < 1800) lengthScore = 80 // Too long
-    else lengthScore = 60  // Way too verbose
+    if (wordCount < 150) lengthScore = 65  // Raised from 40
+    else if (wordCount < 250) lengthScore = 75  // Raised from 60
+    else if (wordCount < 400) lengthScore = 88  // Raised from 85
+    else if (wordCount < 800) lengthScore = 100 // Ideal range (unchanged)
+    else if (wordCount < 1200) lengthScore = 97 // Raised from 95
+    else if (wordCount < 1800) lengthScore = 90 // Raised from 80
+    else lengthScore = 78  // Raised from 60
 
-    const parsingScore = Math.max(0, Math.min(100, validationScore || 0))
-    const contentScore = Math.max(0, Math.min(100, resumeQuality.professionalScore || 0))
-    const relevanceScore = Math.max(0, Math.min(100, Math.round(semanticScore * 100)))
-    const impactScore = Math.max(0, Math.min(100, metricCoverage))
-    const clarityScore = Math.max(0, Math.min(
+    // Component scores with INDUSTRY-STANDARD BASELINES
+    const parsingScore = Math.max(60, Math.min(100, validationScore || 60))  // Floor at 60
+    const contentScore = Math.max(55, Math.min(100, resumeQuality.professionalScore || 55))  // Floor at 55
+    const relevanceScore = Math.max(65, Math.min(100, Math.round(semanticScore * 100)))  // Floor at 65
+    const impactScore = Math.max(30, Math.min(100, metricCoverage))  // Floor at 30
+    const clarityScore = Math.max(50, Math.min(
       100,
       Math.round(
         (resumeTone.score * 100) -
-        (specificIssues.passiveVerbExamples.length * 6) -
-        (specificIssues.casualWords.length * 8) -
-        (specificIssues.specialCharacters.length * 7)
+        (specificIssues.passiveVerbExamples.length * 3) -  // Reduced penalty from 6
+        (specificIssues.casualWords.length * 4) -  // Reduced penalty from 8
+        (specificIssues.specialCharacters.length * 3)  // Reduced penalty from 7
       )
-    ))
+    ))  // Floor at 50
 
     // ADAPTIVE WEIGHTING based on role level
     let industryScore = 0
@@ -1448,7 +1450,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Use industry-standard score as the final overall ATS score
-    overallAtsScore = Math.max(0, Math.min(100, industryScore))
+    // Apply industry baseline boost (most ATS systems range 70-90 for decent resumes)
+    const industryBaseline = 8  // Boost to align with market standards
+    overallAtsScore = Math.max(45, Math.min(100, industryScore + industryBaseline))
 
     const evidenceInsights = buildEvidenceInsights(resume, detectedSkills, {
       passiveVerbExamples: specificIssues.passiveVerbExamples,
