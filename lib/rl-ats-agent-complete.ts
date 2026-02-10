@@ -163,24 +163,24 @@ export class AIAgentEngine {
     
     // ENHANCED: Define diverse resume distribution patterns (based on real industry data)
     const distributions = [
-      // Freshers - Recent graduates (12% of candidates)
-      { tech: [35, 65], exp: [0, 1], edu: [7, 10], comm: [50, 75], lead: [15, 40], cult: [60, 85], weight: 0.12, label: 'Fresher' },
-      // Freshers - Exceptional (3% of candidates) - high potential, low experience
-      { tech: [70, 90], exp: [0, 1], edu: [8, 10], comm: [65, 85], lead: [30, 55], cult: [70, 90], weight: 0.03, label: 'Exceptional Fresher' },
-      // Junior - Entry level (15% of candidates)
-      { tech: [40, 70], exp: [1, 3], edu: [5, 8], comm: [45, 80], lead: [20, 55], cult: [55, 85], weight: 0.15, label: 'Junior' },
-      // Junior - High performer (5% of candidates)
-      { tech: [65, 85], exp: [1, 3], edu: [6, 9], comm: [60, 85], lead: [40, 65], cult: [65, 90], weight: 0.05, label: 'High Performer Junior' },
-      // Mid-level - Standard (18% of candidates)
-      { tech: [55, 80], exp: [3, 6], edu: [5, 8], comm: [55, 85], lead: [40, 70], cult: [60, 88], weight: 0.18, label: 'Mid-level' },
-      // Mid-level - Strong (12% of candidates)
-      { tech: [70, 90], exp: [3, 7], edu: [6, 9], comm: [65, 90], lead: [50, 80], cult: [65, 92], weight: 0.12, label: 'Strong Mid-level' },
-      // Senior - Standard (10% of candidates)
-      { tech: [70, 90], exp: [7, 12], edu: [5, 9], comm: [70, 92], lead: [60, 85], cult: [68, 92], weight: 0.10, label: 'Senior' },
-      // Senior - Leadership focused (6% of candidates)
-      { tech: [65, 85], exp: [8, 15], edu: [6, 10], comm: [75, 95], lead: [75, 95], cult: [75, 95], weight: 0.06, label: 'Senior Leader' },
-      // Principal/Staff - Technical experts (4% of candidates)
-      { tech: [85, 98], exp: [8, 20], edu: [7, 10], comm: [70, 90], lead: [55, 80], cult: [65, 90], weight: 0.04, label: 'Principal/Staff' },
+      // Freshers - Recent graduates (10% of candidates) - reduced weight
+      { tech: [35, 65], exp: [0, 1], edu: [7, 10], comm: [50, 75], lead: [15, 40], cult: [60, 85], weight: 0.10, label: 'Fresher' },
+      // Freshers - Exceptional (2% of candidates) - high potential, low experience
+      { tech: [70, 90], exp: [0, 1], edu: [8, 10], comm: [65, 85], lead: [30, 55], cult: [70, 90], weight: 0.02, label: 'Exceptional Fresher' },
+      // Junior - Entry level (13% of candidates)
+      { tech: [40, 70], exp: [1, 3], edu: [5, 8], comm: [45, 80], lead: [20, 55], cult: [55, 85], weight: 0.13, label: 'Junior' },
+      // Junior - High performer (4% of candidates)
+      { tech: [65, 85], exp: [1, 3], edu: [6, 9], comm: [60, 85], lead: [40, 65], cult: [65, 90], weight: 0.04, label: 'High Performer Junior' },
+      // Mid-level - Standard (16% of candidates)
+      { tech: [55, 80], exp: [3, 6], edu: [5, 8], comm: [55, 85], lead: [40, 70], cult: [60, 88], weight: 0.16, label: 'Mid-level' },
+      // Mid-level - Strong (10% of candidates)
+      { tech: [70, 90], exp: [3, 7], edu: [6, 9], comm: [65, 90], lead: [50, 80], cult: [65, 92], weight: 0.10, label: 'Strong Mid-level' },
+      // Senior - Standard (9% of candidates)
+      { tech: [70, 90], exp: [7, 12], edu: [5, 9], comm: [70, 92], lead: [60, 85], cult: [68, 92], weight: 0.09, label: 'Senior' },
+      // Senior - Leadership focused (5% of candidates)
+      { tech: [65, 85], exp: [8, 15], edu: [6, 10], comm: [75, 95], lead: [75, 95], cult: [75, 95], weight: 0.05, label: 'Senior Leader' },
+      // Principal/Staff - Technical experts (3% of candidates)
+      { tech: [85, 98], exp: [8, 20], edu: [7, 10], comm: [70, 90], lead: [55, 80], cult: [65, 90], weight: 0.03, label: 'Principal/Staff' },
       // Specialists - Domain experts (3% of candidates)
       { tech: [80, 95], exp: [5, 15], edu: [7, 10], comm: [60, 85], lead: [45, 75], cult: [60, 88], weight: 0.03, label: 'Specialist' },
       // Career changers - Strong background (3% of candidates)
@@ -192,7 +192,21 @@ export class AIAgentEngine {
       // Technical genius, poor communication (2% of candidates)
       { tech: [85, 98], exp: [3, 10], edu: [7, 10], comm: [30, 55], lead: [20, 50], cult: [40, 70], weight: 0.02, label: 'Tech Genius Low Comm' },
       // Great culture fit, mediocre skills (2% of candidates)
-      { tech: [40, 65], exp: [2, 8], edu: [5, 8], comm: [75, 92], lead: [65, 88], cult: [80, 95], weight: 0.02, label: 'Culture Champion' }
+      { tech: [40, 65], exp: [2, 8], edu: [5, 8], comm: [75, 92], lead: [65, 88], cult: [80, 95], weight: 0.02, label: 'Culture Champion' },
+      
+      // ===== TRULY BAD RESUMES (9% of candidates) - NEW =====
+      // Unqualified with poor communication (3% of candidates)
+      { tech: [10, 35], exp: [0, 2], edu: [3, 6], comm: [20, 45], lead: [10, 30], cult: [30, 55], weight: 0.03, label: 'Unqualified Poor Comm' },
+      // Minimal effort / Very short resume (2% of candidates)
+      { tech: [15, 40], exp: [0, 3], edu: [4, 7], comm: [25, 50], lead: [15, 35], cult: [35, 60], weight: 0.02, label: 'Minimal Effort' },
+      // Completely irrelevant experience (2% of candidates)
+      { tech: [20, 45], exp: [2, 8], edu: [4, 7], comm: [35, 60], lead: [20, 45], cult: [40, 65], weight: 0.02, label: 'Irrelevant Experience' },
+      // No skills listed / Generic resume (1% of candidates)
+      { tech: [12, 30], exp: [0, 4], edu: [3, 6], comm: [30, 55], lead: [12, 35], cult: [32, 58], weight: 0.01, label: 'No Skills Listed' },
+      // Poor formatting / Typos (0.5% of candidates)
+      { tech: [18, 42], exp: [1, 5], edu: [4, 7], comm: [22, 48], lead: [15, 38], cult: [28, 52], weight: 0.005, label: 'Poor Formatting' },
+      // Extremely underqualified (0.5% of candidates)
+      { tech: [8, 25], exp: [0, 1], edu: [2, 5], comm: [18, 40], lead: [8, 25], cult: [25, 50], weight: 0.005, label: 'Extremely Underqualified' }
     ]
     
     for (let i = 0; i < count; i++) {
