@@ -129,11 +129,11 @@ export class AIAgentEngine {
    * Pre-train on simulated hiring data
    */
   private preTrainOnSimulatedData(): void {
-    // ULTIMATE SCALE: 1 billion training decisions via streaming batches
-    const batchSize = 10000;  // Generate 10K at a time
-    const totalBatches = 100000;  // 100,000 batches × 10,000 = 1 BILLION decisions
+    // Train on 10 MILLION decisions for build environment (100x smaller)
+    const batchSize = 50000;  // 50K per batch
+    const totalBatches = 200;  // 200 batches × 50K = 10 MILLION decisions
     
-    console.log('🚀 Starting Q-Learning pre-training: 1 BILLION decisions...');
+    console.log('🚀 Q-Learning pre-training: 10 MILLION decisions (build environment)');
     
     let processedCount = 0;
     const startTime = Date.now();
@@ -159,15 +159,15 @@ export class AIAgentEngine {
         processedCount++;
       }
       
-      // Log progress every 10 million
-      if ((batchNum + 1) % 1000 === 0) {
+      // Log progress every 1 million
+      if ((batchNum + 1) % 20 === 0) {
         const elapsed = (Date.now() - startTime) / 1000;
-        console.log(`✅ Q-Trained on ${processedCount.toLocaleString()} decisions (${Math.round((batchNum + 1) / totalBatches * 100)}%) - ${(elapsed).toFixed(1)}s elapsed`);
+        console.log(`✅ Q-Trained on ${processedCount.toLocaleString()} decisions (${Math.round((batchNum + 1) / totalBatches * 100)}%) - ${(elapsed).toFixed(1)}s`);
       }
     }
     
     const totalTime = (Date.now() - startTime) / 1000;
-    console.log(`🏆 Q-LEARNING COMPLETE: 1,000,000,000 decisions trained in ${totalTime.toFixed(1)}s`);
+    console.log(`🏆 Q-LEARNING: 10,000,000 decisions trained in ${totalTime.toFixed(1)}s`);
   }
 
   /**

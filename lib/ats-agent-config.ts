@@ -113,16 +113,16 @@ export function loadAgentConfig(agentType: 'custom' | 'intelligent' | 'rl'): Age
     },
     
     featureWeights: {
-      technical: parseFloat(process.env.WEIGHT_TECHNICAL || '0.28'),
-      experience: parseFloat(process.env.WEIGHT_EXPERIENCE || '0.20'),
-      communication: parseFloat(process.env.WEIGHT_COMMUNICATION || '0.18'),
-      culture: parseFloat(process.env.WEIGHT_CULTURE || '0.15'),
-      education: parseFloat(process.env.WEIGHT_EDUCATION || '0.12'),
-      leadership: parseFloat(process.env.WEIGHT_LEADERSHIP || '0.07'),
-      impact: parseFloat(process.env.WEIGHT_IMPACT || '0.25'),
-      innovation: parseFloat(process.env.WEIGHT_INNOVATION || '0.23'),
-      softSkills: parseFloat(process.env.WEIGHT_SOFT_SKILLS || '0.20'),
-      quality: parseFloat(process.env.WEIGHT_QUALITY || '0.18')
+      technical: parseFloat(process.env.WEIGHT_TECHNICAL || '0.15'),
+      experience: parseFloat(process.env.WEIGHT_EXPERIENCE || '0.11'),
+      communication: parseFloat(process.env.WEIGHT_COMMUNICATION || '0.10'),
+      culture: parseFloat(process.env.WEIGHT_CULTURE || '0.08'),
+      education: parseFloat(process.env.WEIGHT_EDUCATION || '0.06'),
+      leadership: parseFloat(process.env.WEIGHT_LEADERSHIP || '0.04'),
+      impact: parseFloat(process.env.WEIGHT_IMPACT || '0.13'),
+      innovation: parseFloat(process.env.WEIGHT_INNOVATION || '0.12'),
+      softSkills: parseFloat(process.env.WEIGHT_SOFT_SKILLS || '0.11'),
+      quality: parseFloat(process.env.WEIGHT_QUALITY || '0.10')
     },
     
     penalties: {
