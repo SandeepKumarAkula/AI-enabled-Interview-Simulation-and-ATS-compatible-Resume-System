@@ -580,7 +580,7 @@ const generateAISuggestions = async (
       suggestions: structureSuggestions
     })
 
-    // 6. SCORE DRIVERS - Industry-standard breakdown
+    // 6. SCORE DRIVERS - Industry-standard breakdown with PERSONALIZED ACTIONS
     if (analysisData.industryScoreBreakdown) {
       const d = analysisData.industryScoreBreakdown
       const drivers = [
@@ -591,18 +591,42 @@ const generateAISuggestions = async (
         { label: 'Experience', score: d.experience },
         { label: 'Impact', score: d.impact },
         { label: 'Clarity', score: d.clarity },
+        { label: 'Length', score: d.length },
       ]
       drivers.sort((a, b) => b.score - a.score)
       const topDrivers = drivers.slice(0, 2).map(dv => `${dv.label}: ${dv.score}/100`).join(', ')
       const bottomDrivers = drivers.slice(-2).map(dv => `${dv.label}: ${dv.score}/100`).join(', ')
 
+      const actionableInsights: string[] = [
+        `Role level detected: ${d.roleLevel.toUpperCase()}. Resume length: ${d.wordCount} words (${d.length}/100 score).`,
+        `Top strengths: ${topDrivers}.`,
+        `Primary improvement areas: ${bottomDrivers}.`,
+      ]
+
+      // PERSONALIZED recommendations based on what's weak
+      if (d.experience < 60) {
+        actionableInsights.push(`⚠️ Experience score is ${d.experience}/100 (${d.experienceYears} years detected). Add more detail about your work history or clarify your years of experience.`)
+      }
+      if (d.skills < 60) {
+        actionableInsights.push(`⚠️ Skills score is ${d.skills}/100. List more technical skills or align them better with the job requirements.`)
+      }
+      if (d.metricsCoverage < 40) {
+        actionableInsights.push(`⚠️ Only ${d.metricsCoverage}% of your bullets include metrics. Add numbers: % improvements, $ saved, team size, users reached.`)
+      }
+      if (d.clarity < 60) {
+        actionableInsights.push(`⚠️ Clarity score is ${d.clarity}/100. Remove passive voice, casual language, and problematic symbols.`)
+      }
+      if (d.length < 75) {
+        if (d.wordCount < 300) {
+          actionableInsights.push(`⚠️ Resume is too short (${d.wordCount} words). Add more detail about achievements and responsibilities.`)
+        } else if (d.wordCount > 1200) {
+          actionableInsights.push(`⚠️ Resume is too long (${d.wordCount} words). Focus on impact and remove redundant details.`)
+        }
+      }
+
       suggestions.push({
-        category: 'Score Drivers',
-        suggestions: [
-          `Top strengths: ${topDrivers}.`,
-          `Primary improvement areas: ${bottomDrivers}.`,
-          `Metrics coverage: ${d.metricsCoverage}% of bullet points include measurable results.`
-        ]
+        category: `Score Drivers (${d.roleLevel.toUpperCase()} Level)`,
+        suggestions: actionableInsights
       })
     }
 
@@ -1214,10 +1238,14 @@ export async function POST(request: NextRequest) {
     const strongSignals = strongTechnical || strongCommunication
     const dualStrongSignals = strongTechnical && strongCommunication
 
-    if (dualStrongSignals) deterministicDecision = 'HIRE'
-    else if (strongSignals) deterministicDecision = 'CONSIDER'
-    else if (featureComposite >= 75) deterministicDecision = 'HIRE'
-    else if (featureComposite >= 60) deterministicDecision = 'CONSIDER'
+    // More granular thresholds for better differentiation
+    if (dualStrongSignals && featureComposite >= 70) deterministicDecision = 'HIRE'
+    else if (dualStrongSignals) deterministicDecision = 'CONSIDER'
+    else if (strongSignals && featureComposite >= 65) deterministicDecision = 'CONSIDER'
+    else if (featureComposite >= 78) deterministicDecision = 'HIRE'
+    else if (featureComposite >= 62) deterministicDecision = 'CONSIDER'
+    else if (featureComposite >= 45) deterministicDecision = 'CONSIDER'
+    // else stays REJECT
 
     const reasoningParts = [] as string[]
     if (strongTechnical) reasoningParts.push('Strong technical skills')
@@ -1317,7 +1345,7 @@ export async function POST(request: NextRequest) {
       overallAtsScore = Math.round(Math.max(0, Math.min(100, overallAtsScore * lenMul)))
     } catch {}
 
-    // INDUSTRY STANDARD SCORING - deterministic and explainable
+    // INDUSTRY STANDARD SCORING - deterministic and explainable with high variance
     const resumeLinesForScoring = getResumeLines(resume)
     const bulletLinesForScoring = resumeLinesForScoring.filter(line => BULLET_PATTERN.test(line))
     const metricLinesForScoring = bulletLinesForScoring.filter(line => METRIC_PATTERN.test(line))
@@ -1325,33 +1353,99 @@ export async function POST(request: NextRequest) {
       ? Math.round((metricLinesForScoring.length / bulletLinesForScoring.length) * 100)
       : 30
 
+    // NON-LINEAR experience scoring for better differentiation
+    let experienceScore = 0
+    if (experienceYears === 0 || experienceYears < 0.5) experienceScore = 15
+    else if (experienceYears < 1) experienceScore = 30
+    else if (experienceYears < 2) experienceScore = 50
+    else if (experienceYears < 3) experienceScore = 65
+    else if (experienceYears < 5) experienceScore = 75
+    else if (experienceYears < 8) experienceScore = 85
+    else if (experienceYears < 12) experienceScore = 92
+    else experienceScore = 98
+
+    // SKILLS QUALITY scoring (not just count) - depth over breadth
+    let skillsScore = 0
+    if (jobSkills.length > 0) {
+      // Job-specific match percentage + bonus for demonstrating depth
+      const depthBonus = matchedSkills.length > 5 ? 10 : matchedSkills.length > 3 ? 5 : 0
+      skillsScore = Math.min(100, skillMatchPercentage + depthBonus)
+    } else {
+      // No job description: reward depth (5+ skills good, 10+ excellent, 15+ exceptional)
+      if (detectedSkills.length < 3) skillsScore = 20
+      else if (detectedSkills.length < 5) skillsScore = 40
+      else if (detectedSkills.length < 8) skillsScore = 60
+      else if (detectedSkills.length < 12) skillsScore = 75
+      else if (detectedSkills.length < 18) skillsScore = 88
+      else skillsScore = 95
+    }
+
+    // ROLE LEVEL detection for adaptive weighting
+    const seniorKeywords = (resume.match(/senior|lead|principal|architect|director|manager|vp|head of|chief/gi) || []).length
+    const juniorKeywords = (resume.match(/intern|junior|entry.level|associate|assistant|trainee/gi) || []).length
+    const roleLevel = seniorKeywords > juniorKeywords ? 'senior' : juniorKeywords > 1 ? 'junior' : 'mid'
+
+    // LENGTH normalization (too short = incomplete, too long = unfocused)
+    const wordCount = resume.split(/\s+/).length
+    let lengthScore = 100
+    if (wordCount < 150) lengthScore = 40  // Way too short
+    else if (wordCount < 250) lengthScore = 60  // Too brief
+    else if (wordCount < 400) lengthScore = 85  // Good for junior
+    else if (wordCount < 800) lengthScore = 100 // Ideal range
+    else if (wordCount < 1200) lengthScore = 95 // Slightly long
+    else if (wordCount < 1800) lengthScore = 80 // Too long
+    else lengthScore = 60  // Way too verbose
+
     const parsingScore = Math.max(0, Math.min(100, validationScore || 0))
     const contentScore = Math.max(0, Math.min(100, resumeQuality.professionalScore || 0))
     const relevanceScore = Math.max(0, Math.min(100, Math.round(semanticScore * 100)))
-    const skillsScore = jobSkills.length > 0
-      ? Math.max(0, Math.min(100, skillMatchPercentage))
-      : Math.max(0, Math.min(100, detectedSkills.length * 6))
-    const experienceScore = Math.max(0, Math.min(100, Math.round(experienceYears * 10)))
     const impactScore = Math.max(0, Math.min(100, metricCoverage))
     const clarityScore = Math.max(0, Math.min(
       100,
       Math.round(
         (resumeTone.score * 100) -
-        (specificIssues.passiveVerbExamples.length * 5) -
-        (specificIssues.casualWords.length * 5) -
-        (specificIssues.specialCharacters.length * 5)
+        (specificIssues.passiveVerbExamples.length * 6) -
+        (specificIssues.casualWords.length * 8) -
+        (specificIssues.specialCharacters.length * 7)
       )
     ))
 
-    const industryScore = Math.round(
-      (parsingScore * 0.15) +
-      (contentScore * 0.20) +
-      (relevanceScore * 0.20) +
-      (skillsScore * 0.15) +
-      (experienceScore * 0.15) +
-      (impactScore * 0.10) +
-      (clarityScore * 0.05)
-    )
+    // ADAPTIVE WEIGHTING based on role level
+    let industryScore = 0
+    if (roleLevel === 'senior') {
+      industryScore = Math.round(
+        (parsingScore * 0.10) +
+        (contentScore * 0.18) +
+        (relevanceScore * 0.15) +
+        (skillsScore * 0.12) +
+        (experienceScore * 0.25) +  // Experience matters more for senior
+        (impactScore * 0.15) +       // Impact matters more
+        (clarityScore * 0.03) +
+        (lengthScore * 0.02)
+      )
+    } else if (roleLevel === 'junior') {
+      industryScore = Math.round(
+        (parsingScore * 0.18) +      // Formatting matters more for junior
+        (contentScore * 0.22) +
+        (relevanceScore * 0.18) +
+        (skillsScore * 0.20) +       // Skills matter more for junior
+        (experienceScore * 0.08) +   // Less weight on experience
+        (impactScore * 0.08) +
+        (clarityScore * 0.04) +
+        (lengthScore * 0.02)
+      )
+    } else {
+      industryScore = Math.round(
+        (parsingScore * 0.15) +
+        (contentScore * 0.20) +
+        (relevanceScore * 0.18) +
+        (skillsScore * 0.16) +
+        (experienceScore * 0.16) +
+        (impactScore * 0.10) +
+        (clarityScore * 0.03) +
+        (lengthScore * 0.02)
+      )
+    }
 
     // Use industry-standard score as the final overall ATS score
     overallAtsScore = Math.max(0, Math.min(100, industryScore))
@@ -1386,9 +1480,13 @@ export async function POST(request: NextRequest) {
             relevance: relevanceScore,
             skills: skillsScore,
             experience: experienceScore,
+            experienceYears: experienceYears,
             impact: impactScore,
             clarity: clarityScore,
+            length: lengthScore,
+            wordCount: wordCount,
             metricsCoverage: metricCoverage,
+            roleLevel: roleLevel,
           },
         }
       )
@@ -1472,9 +1570,13 @@ export async function POST(request: NextRequest) {
           relevance: relevanceScore,
           skills: skillsScore,
           experience: experienceScore,
+          experienceYears: experienceYears,
           impact: impactScore,
           clarity: clarityScore,
+          length: lengthScore,
+          wordCount: wordCount,
           metricsCoverage: metricCoverage,
+          roleLevel: roleLevel,
           final: overallAtsScore
         },
         
