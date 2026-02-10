@@ -52,8 +52,17 @@ const getResumeLines = (text: string) =>
 const shortenEvidence = (line: string, maxLen = 140) =>
   line.length > maxLen ? `${line.slice(0, maxLen)}...` : line
 
-const formatEvidence = (lines: string[]) =>
-  lines.map(line => `"${shortenEvidence(line)}"`).join(" | ")
+const formatEvidence = (lines: string[], maxPerLine: number = 140) => {
+  if (!lines || lines.length === 0) return "";
+  // CRITICAL: Remove duplicates and only show up to 2 unique lines
+  const uniqueLines = Array.from(new Set(lines.map(l => l.trim())))
+    .filter(l => l.length > 0)
+    .slice(0, 2); // Maximum 2 different lines
+  
+  return uniqueLines
+    .map(line => `"${shortenEvidence(line, maxPerLine)}"`)
+    .join(" | ");
+};
 
 const findMatchingLines = (lines: string[], regex: RegExp, max = 3) =>
   lines.filter(line => regex.test(line)).slice(0, max)
@@ -400,10 +409,15 @@ const generateAISuggestions = async (
     if (analysisData.skillCount > 0) {
       const topSkills = analysisData.detectedSkills.slice(0, 5)
 
-      const skillEvidence = topSkills
-        .map((skill: string) => findSkillEvidence(lines, skill))
-        .flat()
-        .slice(0, 3)
+      // CRITICAL FIX: Get unique skill evidence (no duplicates from same line)
+      const skillEvidenceSet = new Set<string>()
+      for (const skill of topSkills) {
+        const evidence = findSkillEvidence(lines, skill, 1)
+        evidence.forEach(e => skillEvidenceSet.add(e.trim()))
+        if (skillEvidenceSet.size >= 2) break; // Stop after 2 unique lines
+      }
+      
+      const skillEvidence = Array.from(skillEvidenceSet).slice(0, 2)
 
       const skillSuggestions = [
         `Top detected skills: ${topSkills.join(", ")}. Evidence: ${formatEvidence(skillEvidence) || "No explicit skill lines found."}`,
@@ -419,18 +433,20 @@ const generateAISuggestions = async (
 
     // 2. TONE SUGGESTIONS - Based on actual problematic language found
     if ((analysisData.passiveVerbs && analysisData.passiveVerbs.length > 0) || (analysisData.casualWords && analysisData.casualWords.length > 0)) {
-      const examplePassive = analysisData.passiveVerbs?.[0]?.substring(0, 80)
-      const casualWordsStr = analysisData.casualWords && analysisData.casualWords.length > 0 ? analysisData.casualWords.join(", ") : ""
-      const actionVerb = "Engineered"
+      // CRITICAL FIX: Use first example, not generic placeholder
+      const examplePassive = analysisData.passiveVerbs?.[0]?.trim()
+      const casualWordsStr = analysisData.casualWords && analysisData.casualWords.length > 0 ? analysisData.casualWords.slice(0, 3).join(", ") : ""
 
-      const toneSuggestions = [] as string[]
+      const toneSuggestions: string[] = []
       if (examplePassive) {
-        toneSuggestions.push(`Passive voice detected: "${examplePassive}" - Replace with stronger action: "${actionVerb} the process by..."`)
+        // Extract what the sentence is actually about instead of using placeholder
+        const subject = examplePassive.substring(0, 40).split(/was|were|been|is|are/)[0].trim() || "the work"
+        toneSuggestions.push(`Passive voice detected: "${examplePassive.substring(0, 60)}..." - Rewrite with active voice using action verbs like "led", "built", "designed".`)
       }
-      toneSuggestions.push(`Tone confidence at ${analysisData.toneConfidence}%. Evidence: ${examplePassive ? `"${examplePassive}"` : "No passive lines sampled."}`)
       if (casualWordsStr) {
-        toneSuggestions.push(`Casual language found: "${casualWordsStr}" - Use industry-standard terminology instead.`)
+        toneSuggestions.push(`Casual language found: "${casualWordsStr}" - Replace with professional terminology for better impact.`)
       }
+      toneSuggestions.push(`Professional tone: ${analysisData.toneConfidence}% confidence rating.`)
 
       suggestions.push({
         category: `Professional Language (${analysisData.toneConfidence}% confidence)`,
@@ -438,17 +454,17 @@ const generateAISuggestions = async (
       })
     }
 
-    // 3. METRICS SUGGESTIONS - Show actual gaps found
+    // 3. METRICS SUGGESTIONS - Show actual gaps found in the resume
     if (analysisData.metricsIssues && analysisData.metricsIssues.length > 0) {
       const metricsGap = analysisData.metricsIssues.length
-      const exampleBullet = analysisData.metricsIssues[0]?.substring(0, 85) || "achievement bullet"
+      const exampleBullet = analysisData.metricsIssues[0]?.trim() || "achievement bullet"
       
       const metricsSuggestions = [
-        `Found ${metricsGap} achievement bullets without quantifiable metrics. Evidence: "${exampleBullet}..."`,
-        `Each bullet needs one of: percentage improvement (15% increase), financial impact ($50K saved), team size (led 8 engineers), or scope (reached 500K users).`,
-        `Reframe: "${exampleBullet}" → "Optimized ${exampleBullet.substring(0,30).toLowerCase()} resulting in [X% improvement / $X saved / X team / X users]"`,
-        `Metric-driven bullets are 3x more likely to trigger recruiter callbacks compared to generic descriptions.`
-      ]
+        `Found ${metricsGap} achievement bullets without quantifiable metrics.`,
+        exampleBullet ? `Example: "${exampleBullet.substring(0, 80)}" - Add specific impact metrics.` : "",
+        `Best practice: Each bullet should include one of: % improvement (15% increase), financial impact ($50K saved), team size (led 8 engineers), or scale (reached 500K users).`,
+        `Tip: Metric-driven bullets are 3x more likely to trigger recruiter callbacks.`
+      ].filter(s => s)
       
       suggestions.push({
         category: `Quantification (${metricsGap} bullets need metrics)`,
@@ -473,15 +489,25 @@ const generateAISuggestions = async (
         suggestions: formatSuggestions
       })
     } else {
-      const hasBullets = bulletPoints.length > 0 || /[•▪►·]/.test(resumeText)
+      // CRITICAL FIX: Only show bullet count if we actually found bullets in formatting
+      // Don't show misleading "All 0 bullet points" message
+      const hasBullets = bulletPoints.length > 0
+      const hasBulletSymbols = /[•\-▪►·]/.test(resumeText)
+      
+      const formattingRemarks = [
+        hasBullets || hasBulletSymbols 
+          ? `✅ Your resume uses ATS-compatible formatting with standard bullets (•, -).`
+          : `ATS-compatible formatting detected. Consider using standard bullet points (• or -) for better scannability.`,
+        `Cleanliness score: 100% - No problematic special characters detected.`,
+        hasBullets && bulletPoints.length > 0
+          ? `Bullet points detected: ${bulletPoints.length} formatted items. ${bulletPoints.length > 5 ? "Good coverage." : "Consider adding more detail to bullets."}`
+          : "No bullet-formatted content detected in this analysis.",
+        `Continue using consistent, simple formatting for optimal ATS compatibility.`
+      ]
+      
       suggestions.push({
         category: "Formatting Status",
-        suggestions: [
-          hasBullets ? `✅ Your resume uses ATS-compatible formatting: standard bullets (•, -) throughout.` : "ATS-compatible formatting detected with no special symbols.",
-          `Cleanliness score: 100% - No parsing barriers for automated systems.`,
-          hasBullets ? `All ${bulletPoints.length} bullet points are properly formatted for ATS readers.` : "No bullet points detected - consider using bullets to improve scanability.",
-          `Continue using this formatting pattern for ATS compatibility.`
-        ]
+        suggestions: formattingRemarks
       })
     }
 
@@ -490,7 +516,7 @@ const generateAISuggestions = async (
     const hasEducation = resumeText.match(/education|degree|university|college/gi) ? true : false
     const hasSkills = resumeText.match(/skill|technical|language|tool/gi) ? true : false
     const hasProjects = resumeText.match(/project|portfolio|github/gi) ? true : false
-    const hasCertifications = resumeText.match(/certification|certification|aws|google|microsoft/gi) ? true : false
+    const hasCertifications = resumeText.match(/certification|aws|google|microsoft/gi) ? true : false
     
     const presentSections = [
       hasExperience && "Work Experience",
@@ -525,9 +551,9 @@ const generateAISuggestions = async (
         ? `Missing recommended sections: ${missingSections.join(", ")}.`
         : "All core resume sections are present.",
       `Structure validation: ${analysisData.validationScore}% completeness. ${analysisData.validationScore >= 80 ? "Excellent parsing compatibility." : "Some sections may be missing or poorly labeled."}`,
-      bulletDescriptions.length > 0 || /[•▪►·]/.test(resumeText)
-        ? `Average bullet description length: ${Math.round(accurateAvgBulletLength)} characters - ${accurateAvgBulletLength > 150 ? "descriptions are detailed and impactful" : bulletDescriptions.length > 0 ? "consider adding more detail to bullets" : "no content in bullets"}.`
-        : "No bullet points detected - add concise bullet statements under each role or project."
+      bulletDescriptions.length > 0
+        ? `${bulletDescriptions.length} descriptive bullet points found. Average length: ${Math.round(accurateAvgBulletLength)} characters - ${accurateAvgBulletLength > 150 ? "detailed and comprehensive" : bulletDescriptions.length >= 5 ? "moderate depth" : "consider expanding descriptions"}.`
+        : "No bullet-point descriptions detected. Add concise bullet statements under each role or project."
     ]
     
     suggestions.push({
@@ -542,21 +568,25 @@ const generateAISuggestions = async (
       const matchedSkills = analysisData.detectedSkills.filter((skill: string) =>
         jobSkills.some(js => js.includes(skill) || skill.includes(js))
       )
-      const missingSkills = jobSkills.filter(js => !matchedSkills.includes(js)).slice(0, 10)
+      const missingSkills = jobSkills.filter(js => !matchedSkills.includes(js)).slice(0, 5)
 
-      const matchedEvidence = matchedSkills
-        .map((skill: string) => findSkillEvidence(lines, skill))
-        .flat()
-        .slice(0, 3)
+      // CRITICAL FIX: Get unique evidence for matched skills (no duplicates)
+      const matchedEvidenceSet = new Set<string>()
+      for (const skill of matchedSkills.slice(0, 4)) {
+        const evidence = findSkillEvidence(lines, skill, 1)
+        evidence.forEach(e => matchedEvidenceSet.add(e.trim()))
+        if (matchedEvidenceSet.size >= 2) break;
+      }
+      const matchedEvidence = Array.from(matchedEvidenceSet).slice(0, 2)
 
       const jobSuggestions = [
-        `Job alignment analysis: ${alignment}% semantic match between resume and job description.`,
+        `Job alignment: ${alignment}% semantic match between your resume and the job description.`,
         matchedSkills.length > 0
-          ? `Matched job skills found in your resume: ${matchedSkills.slice(0, 6).join(", ")}. Evidence: ${formatEvidence(matchedEvidence) || "No explicit lines found."}`
-          : "No clear skill matches detected between your resume and the job description.",
+          ? `✅ Matched skills in your resume: ${matchedSkills.slice(0, 5).join(", ")}. ${matchedEvidence.length > 0 ? `Evidence: ${formatEvidence(matchedEvidence)}` : ""}`
+          : "❌ No clear skill matches detected between your resume and this job.",
         missingSkills.length > 0
-          ? `Missing job skills not found in your resume: ${missingSkills.slice(0, 6).join(", ")}.`
-          : "No missing job skills detected based on the description.",
+          ? `⚠️ Skills to add or emphasize: ${missingSkills.slice(0, 4).join(", ")}.`
+          : "✅ Your resume covers all key job skills.",
       ]
 
       suggestions.push({
