@@ -614,6 +614,26 @@ const generateAISuggestions = async (
       })
     }
 
+    // 7. EVIDENCE HIGHLIGHTS - Use evidence insights for personalized feedback
+    if (analysisData.evidenceInsights) {
+      const strengths = (analysisData.evidenceInsights.strengths || []).slice(0, 2)
+      const weaknesses = (analysisData.evidenceInsights.weaknesses || []).slice(0, 2)
+      const evidenceSuggestions: string[] = []
+
+      if (strengths.length > 0) {
+        evidenceSuggestions.push(`Strengths from your resume: ${strengths.join(" ")}`)
+      }
+      if (weaknesses.length > 0) {
+        evidenceSuggestions.push(`Areas to improve with evidence: ${weaknesses.join(" ")}`)
+      }
+      if (evidenceSuggestions.length > 0) {
+        suggestions.push({
+          category: "Evidence Highlights",
+          suggestions: evidenceSuggestions
+        })
+      }
+    }
+
     return suggestions
   } catch (error) {
     console.error("Suggestion generation error:", error)
@@ -1147,47 +1167,48 @@ export async function POST(request: NextRequest) {
       agentErrors.push('rlAgent:' + String(e))
     }
 
-    // HARD OVERRIDE: Deterministic decision based on features only
-    // This replaces any RL randomness and ensures consistent outcomes.
-    const atsScoreFromFeatures = Math.round(
-      (rlFeatures.technicalScore * 0.28 +
-        Math.min(rlFeatures.experienceYears / 8, 1) * 20 +
-        (rlFeatures.communicationScore / 100) * 18 +
-        (rlFeatures.cultureFitScore / 100) * 15 +
-        (rlFeatures.educationLevel / 10) * 12 +
-        (rlFeatures.leadershipScore / 100) * 7) / 1.2
+    // Deterministic decision based on features only (no RL randomness)
+    // Uses a clearer composite score and direct strong-signal guardrails.
+    const normalizedExperience = Math.min(10, rlFeatures.experienceYears || 0) * 10
+    const educationScore = Math.min(10, rlFeatures.educationLevel || 0) * 10
+    const featureComposite = Math.round(
+      (rlFeatures.technicalScore * 0.32) +
+      (rlFeatures.communicationScore * 0.22) +
+      (rlFeatures.leadershipScore * 0.12) +
+      (rlFeatures.cultureFitScore * 0.12) +
+      (educationScore * 0.10) +
+      (normalizedExperience * 0.12)
     )
 
     let deterministicDecision: 'HIRE' | 'CONSIDER' | 'REJECT' = 'REJECT'
-    if (atsScoreFromFeatures >= 80) deterministicDecision = 'HIRE'
-    else if (atsScoreFromFeatures >= 65) deterministicDecision = 'CONSIDER'
 
-    // Absolute guardrail: strong individual signals must never result in REJECT
-    if (deterministicDecision === 'REJECT' && (rlFeatures.technicalScore >= 70 || rlFeatures.communicationScore >= 70)) {
-      deterministicDecision = 'CONSIDER'
-    }
+    // Strong signal overrides
+    const strongTechnical = rlFeatures.technicalScore >= 70
+    const strongCommunication = rlFeatures.communicationScore >= 70
+    const strongSignals = strongTechnical || strongCommunication
+    const dualStrongSignals = strongTechnical && strongCommunication
+
+    if (dualStrongSignals) deterministicDecision = 'HIRE'
+    else if (strongSignals) deterministicDecision = 'CONSIDER'
+    else if (featureComposite >= 75) deterministicDecision = 'HIRE'
+    else if (featureComposite >= 60) deterministicDecision = 'CONSIDER'
 
     const reasoningParts = [] as string[]
-    if (rlFeatures.technicalScore >= 70) reasoningParts.push('Strong technical skills')
-    if (rlFeatures.communicationScore >= 70) reasoningParts.push('Excellent communication')
+    if (strongTechnical) reasoningParts.push('Strong technical skills')
+    if (strongCommunication) reasoningParts.push('Excellent communication')
     if (rlFeatures.leadershipScore >= 65) reasoningParts.push('Leadership potential')
     if (rlFeatures.experienceYears >= 3) reasoningParts.push('Relevant experience')
     if (reasoningParts.length === 0) reasoningParts.push('Limited signal strength from resume features')
 
+    const baseConfidence = Math.min(1.0, Math.max(0.3, featureComposite / 100))
+    const confidenceFloor = deterministicDecision === 'REJECT' ? 0.3 : 0.6
+    const finalConfidence = Math.max(confidenceFloor, baseConfidence)
+
     rlDecision = {
       decision: deterministicDecision,
-      confidenceScore: Math.max(
-        deterministicDecision === 'REJECT' ? 0.3 : 0.6,
-        Math.min(1.0, atsScoreFromFeatures / 100)
-      ),
-      qValue: Math.max(
-        deterministicDecision === 'REJECT' ? 0.3 : 0.6,
-        Math.min(1.0, atsScoreFromFeatures / 100)
-      ),
-      predictedSuccessRate: Math.max(
-        deterministicDecision === 'REJECT' ? 0.3 : 0.6,
-        Math.min(1.0, atsScoreFromFeatures / 100)
-      ),
+      confidenceScore: finalConfidence,
+      qValue: finalConfidence,
+      predictedSuccessRate: finalConfidence,
       reasoning: reasoningParts.join(', '),
       candidateId: rlDecision?.candidateId || 'unknown',
     }
@@ -1270,6 +1291,12 @@ export async function POST(request: NextRequest) {
       overallAtsScore = Math.round(Math.max(0, Math.min(100, overallAtsScore * lenMul)))
     } catch {}
 
+    const evidenceInsights = buildEvidenceInsights(resume, detectedSkills, {
+      passiveVerbExamples: specificIssues.passiveVerbExamples,
+      linesWithoutMetrics: specificIssues.linesWithoutMetrics,
+      casualWords: specificIssues.casualWords,
+    })
+
     // Prepare AI-generated improvement suggestions (awaited so client receives an array)
     let improvementSuggestions: Array<{ category: string; suggestions: string[] }> = []
     try {
@@ -1286,7 +1313,8 @@ export async function POST(request: NextRequest) {
           casualWords: specificIssues.casualWords,
           validationScore: validationScore,
           semanticScore: semanticScore,
-          entities: entities
+          entities: entities,
+          evidenceInsights: evidenceInsights,
         }
       )
     } catch (e) {
@@ -1294,12 +1322,6 @@ export async function POST(request: NextRequest) {
       agentErrors.push('suggestions:' + String(e))
       improvementSuggestions = []
     }
-
-    const evidenceInsights = buildEvidenceInsights(resume, detectedSkills, {
-      passiveVerbExamples: specificIssues.passiveVerbExamples,
-      linesWithoutMetrics: specificIssues.linesWithoutMetrics,
-      casualWords: specificIssues.casualWords,
-    })
 
     return NextResponse.json({
       success: true,
