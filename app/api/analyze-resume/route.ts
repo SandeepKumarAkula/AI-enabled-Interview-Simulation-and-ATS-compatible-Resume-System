@@ -1376,12 +1376,12 @@ export async function POST(request: NextRequest) {
       skillsScore = Math.min(100, baseMatch + depthBonus + relevanceBonus)
     } else {
       // No job description: reward depth (more discriminating)
-      if (detectedSkills.length < 3) skillsScore = 25  // Lowered for bad resumes
-      else if (detectedSkills.length < 5) skillsScore = 45  // Lowered
-      else if (detectedSkills.length < 8) skillsScore = 62  // Lowered
-      else if (detectedSkills.length < 12) skillsScore = 76  // Lowered
-      else if (detectedSkills.length < 18) skillsScore = 88  // Lowered
-      else skillsScore = 95  // Slightly lowered
+      if (detectedSkills.length < 3) skillsScore = 28  // Bad resume
+      else if (detectedSkills.length < 5) skillsScore = 50  // Below average
+      else if (detectedSkills.length < 8) skillsScore = 68  // Moderate
+      else if (detectedSkills.length < 12) skillsScore = 82  // Good
+      else if (detectedSkills.length < 18) skillsScore = 92  // Very good
+      else skillsScore = 98  // Excellent (18+ skills)
     }
 
     // ROLE LEVEL detection for adaptive weighting (including FRESHER)
@@ -1480,9 +1480,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Use industry-standard score as the final overall ATS score
-    // Apply minimal baseline boost (reduced to better differentiate bad resumes)
-    const industryBaseline = 2  // Reduced from 8 to allow scores below 50 for truly bad resumes
-    overallAtsScore = Math.max(25, Math.min(100, industryScore + industryBaseline))
+    // Apply baseline boost for excellent resumes
+    const industryBaseline = 5  // Increased to allow excellent resumes to reach 90-95 range
+    overallAtsScore = Math.max(28, Math.min(100, industryScore + industryBaseline))
 
     const evidenceInsights = buildEvidenceInsights(resume, detectedSkills, {
       passiveVerbExamples: specificIssues.passiveVerbExamples,
