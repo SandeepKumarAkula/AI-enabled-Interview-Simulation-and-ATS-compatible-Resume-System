@@ -1376,12 +1376,12 @@ export async function POST(request: NextRequest) {
       skillsScore = Math.min(100, baseMatch + depthBonus + relevanceBonus)
     } else {
       // No job description: reward depth (more discriminating)
-      if (detectedSkills.length < 3) skillsScore = 28  // Bad resume
-      else if (detectedSkills.length < 5) skillsScore = 50  // Below average
-      else if (detectedSkills.length < 8) skillsScore = 68  // Moderate
-      else if (detectedSkills.length < 12) skillsScore = 82  // Good
-      else if (detectedSkills.length < 18) skillsScore = 92  // Very good
-      else skillsScore = 98  // Excellent (18+ skills)
+      if (detectedSkills.length < 3) skillsScore = 25  // Lowered for bad resumes
+      else if (detectedSkills.length < 5) skillsScore = 45  // Lowered
+      else if (detectedSkills.length < 8) skillsScore = 62  // Lowered
+      else if (detectedSkills.length < 12) skillsScore = 76  // Lowered
+      else if (detectedSkills.length < 18) skillsScore = 88  // Lowered
+      else skillsScore = 95  // Slightly lowered
     }
 
     // ROLE LEVEL detection for adaptive weighting (including FRESHER)
@@ -1395,16 +1395,16 @@ export async function POST(request: NextRequest) {
     else if (juniorKeywords > 1 || experienceYears < 2) roleLevel = 'junior'
     else roleLevel = 'mid'
 
-    // LENGTH normalization - BALANCED (more discriminating)
+    // LENGTH normalization - Now allows excellent resumes to reach 90+
     const wordCount = resume.split(/\s+/).length
     let lengthScore = 100
-    if (wordCount < 150) lengthScore = 45  // Lowered for very short resumes
-    else if (wordCount < 250) lengthScore = 60  // Lowered
-    else if (wordCount < 400) lengthScore = 82  // Lowered
-    else if (wordCount < 800) lengthScore = 100 // Ideal range (unchanged)
-    else if (wordCount < 1200) lengthScore = 96 // Slightly lowered
-    else if (wordCount < 1800) lengthScore = 88 // Lowered
-    else lengthScore = 72  // Lowered for very long resumes
+    if (wordCount < 150) lengthScore = 50   // Short resume
+    else if (wordCount < 250) lengthScore = 70   // Below ideal
+    else if (wordCount < 400) lengthScore = 95   // INCREASED from 82 - good length
+    else if (wordCount < 800) lengthScore = 100  // Ideal range
+    else if (wordCount < 1200) lengthScore = 96  // Slightly long
+    else if (wordCount < 1800) lengthScore = 90  // Long
+    else lengthScore = 80  // Very long
 
     // Component scores with BALANCED BASELINES (more discriminating)
     const parsingScore = Math.max(40, Math.min(100, validationScore || 40))  // Floor lowered to 40
@@ -1480,9 +1480,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Use industry-standard score as the final overall ATS score
-    // Apply baseline boost for excellent resumes
-    const industryBaseline = 5  // Increased to allow excellent resumes to reach 90-95 range
-    overallAtsScore = Math.max(28, Math.min(100, industryScore + industryBaseline))
+    // Apply minimal baseline boost (reduced to better differentiate bad resumes)
+    const industryBaseline = 8  // Increased from 2 to allow excellent resumes to reach 90+ range
+    overallAtsScore = Math.max(25, Math.min(100, industryScore + industryBaseline))
 
     const evidenceInsights = buildEvidenceInsights(resume, detectedSkills, {
       passiveVerbExamples: specificIssues.passiveVerbExamples,
