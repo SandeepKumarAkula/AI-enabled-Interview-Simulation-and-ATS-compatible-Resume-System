@@ -1162,6 +1162,11 @@ export async function POST(request: NextRequest) {
     if (atsScoreFromFeatures >= 80) deterministicDecision = 'HIRE'
     else if (atsScoreFromFeatures >= 65) deterministicDecision = 'CONSIDER'
 
+    // Absolute guardrail: strong individual signals must never result in REJECT
+    if (deterministicDecision === 'REJECT' && (rlFeatures.technicalScore >= 70 || rlFeatures.communicationScore >= 70)) {
+      deterministicDecision = 'CONSIDER'
+    }
+
     const reasoningParts = [] as string[]
     if (rlFeatures.technicalScore >= 70) reasoningParts.push('Strong technical skills')
     if (rlFeatures.communicationScore >= 70) reasoningParts.push('Excellent communication')
@@ -1171,9 +1176,18 @@ export async function POST(request: NextRequest) {
 
     rlDecision = {
       decision: deterministicDecision,
-      confidenceScore: Math.max(0.3, Math.min(1.0, atsScoreFromFeatures / 100)),
-      qValue: Math.max(0.3, Math.min(1.0, atsScoreFromFeatures / 100)),
-      predictedSuccessRate: Math.max(0.3, Math.min(1.0, atsScoreFromFeatures / 100)),
+      confidenceScore: Math.max(
+        deterministicDecision === 'REJECT' ? 0.3 : 0.6,
+        Math.min(1.0, atsScoreFromFeatures / 100)
+      ),
+      qValue: Math.max(
+        deterministicDecision === 'REJECT' ? 0.3 : 0.6,
+        Math.min(1.0, atsScoreFromFeatures / 100)
+      ),
+      predictedSuccessRate: Math.max(
+        deterministicDecision === 'REJECT' ? 0.3 : 0.6,
+        Math.min(1.0, atsScoreFromFeatures / 100)
+      ),
       reasoning: reasoningParts.join(', '),
       candidateId: rlDecision?.candidateId || 'unknown',
     }
