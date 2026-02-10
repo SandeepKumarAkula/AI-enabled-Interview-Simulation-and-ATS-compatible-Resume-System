@@ -129,25 +129,47 @@ export class AIAgentEngine {
    * Pre-train on simulated hiring data
    */
   private preTrainOnSimulatedData(): void {
-    // ULTRA-COMPREHENSIVE: 5M diverse decisions covering ALL resume types + edge cases
-    console.log('🚀 Training RL agent on 5 MILLION diverse resume patterns covering ALL quality types + edge cases...');
-    const simulatedDecisions = this.generateSimulatedHiringData(5000000)
+    // ULTRA-COMPREHENSIVE: 2M diverse decisions with 50+ resume types and edge cases
+    // Generates in 100K batches to avoid loading all data into memory at once
+    console.log('🚀 Training RL agent on 2 MILLION diverse resume patterns (50+ types, edge cases)...');
     
-    for (const decision of simulatedDecisions) {
-      const state = this.quantizeFeatures(decision.features)
-      const nextState = this.quantizeFeatures({
-        technicalScore: Math.min(100, decision.features.technicalScore + 10),
-        experienceYears: Math.min(50, decision.features.experienceYears + 2),
-        educationLevel: decision.features.educationLevel,
-        communicationScore: Math.min(100, decision.features.communicationScore + 5),
-        leadershipScore: Math.min(100, decision.features.leadershipScore + 5),
-        cultureFitScore: Math.min(100, decision.features.cultureFitScore + 5)
-      })
+    let totalProcessed = 0;
+    const startTime = Date.now();
+    const totalToTrain = 2000000;
+    const batchSize = 100000; // Generate 100K at a time to manage memory
+    
+    // Stream training data in chunks instead of loading all 2M at once
+    for (let batchStart = 0; batchStart < totalToTrain; batchStart += batchSize) {
+      const remainingCount = Math.min(batchSize, totalToTrain - batchStart);
+      const simulatedDecisions = this.generateSimulatedHiringData(remainingCount)
       
-      const reward = decision.hired ? 1.0 : 0.0
-      const action = decision.hired ? 'hire' : 'reject'
-      this.updateQValue(state, action, reward, nextState)
+      for (const decision of simulatedDecisions) {
+        const state = this.quantizeFeatures(decision.features)
+        const nextState = this.quantizeFeatures({
+          technicalScore: Math.min(100, decision.features.technicalScore + 10),
+          experienceYears: Math.min(50, decision.features.experienceYears + 2),
+          educationLevel: decision.features.educationLevel,
+          communicationScore: Math.min(100, decision.features.communicationScore + 5),
+          leadershipScore: Math.min(100, decision.features.leadershipScore + 5),
+          cultureFitScore: Math.min(100, decision.features.cultureFitScore + 5)
+        })
+        
+        const reward = decision.hired ? 1.0 : 0.0
+        const action = decision.hired ? 'hire' : 'reject'
+        this.updateQValue(state, action, reward, nextState)
+        totalProcessed++
+      }
+      
+      // Log progress every 100k
+      if (totalProcessed % 100000 === 0) {
+        const elapsed = (Date.now() - startTime) / 1000
+        console.log(`✅ Trained on ${totalProcessed.toLocaleString()} patterns (${Math.round((totalProcessed / totalToTrain) * 100)}%) in ${elapsed.toFixed(1)}s`)
+      }
     }
+    
+    const totalTime = (Date.now() - startTime) / 1000
+    console.log(`🏆 RL Agent Pre-training COMPLETE: ${totalToTrain.toLocaleString()} diverse resumes trained in ${totalTime.toFixed(1)}s`)
+    console.log(`📊 Agent understands: Elite→Excellent→Strong→Good→Average→Below Avg→Poor→Terrible tiers`)
   }
 
   /**

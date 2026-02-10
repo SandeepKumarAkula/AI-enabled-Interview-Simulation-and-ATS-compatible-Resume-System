@@ -159,41 +159,45 @@ export class AIAgentEngine {
   /**
    * Pre-train on massive simulated hiring data to jumpstart learning
    * Trains on billions of resume patterns through synthetic data
-   * COMPREHENSIVE: Uses 1M samples covering all resume quality spectrum
+   * OPTIMIZED: Streams 2M samples in batches to avoid memory overflow
    */
   private preTrainOnSimulatedData(): void {
-    // Simulate 5,000,000+ diverse hiring decisions with enhanced edge cases
-    // This represents training across the FULL quality spectrum with massive variation in ALL dimensions
-    console.log('🚀 Training RL agent on 5 MILLION diverse resume patterns covering ALL quality types + edge cases...');
-    const simulatedDecisions = this.generateSimulatedHiringData(5000000);
+    // Simulate 2,000,000 diverse hiring decisions (optimized for memory efficiency)
+    // Generates in 100K batches to avoid loading all data into memory at once
+    console.log('🚀 Training RL agent on 2 MILLION diverse resume patterns (50+ types, edge cases)...');
     
-    // Train on simulated data in batches for efficiency
-    let processedCount = 0;
+    let totalProcessed = 0;
     const startTime = Date.now();
+    const totalToTrain = 2000000;
+    const batchSize = 100000; // Generate 100K at a time to manage memory
     
-    for (let batch = 0; batch < simulatedDecisions.length; batch += 5000) {
-      const batchData = simulatedDecisions.slice(batch, batch + 5000);
-      batchData.forEach(decision => {
+    // Stream training data in chunks instead of loading all 2M at once
+    for (let batchStart = 0; batchStart < totalToTrain; batchStart += batchSize) {
+      const remainingCount = Math.min(batchSize, totalToTrain - batchStart);
+      const simulatedDecisions = this.generateSimulatedHiringData(remainingCount);
+      
+      // Process and immediately discard to free memory
+      simulatedDecisions.forEach(decision => {
         this.learnFromOutcome(
           decision.candidateId,
           decision.hired,
           decision.performanceRating
         );
-        processedCount++;
+        totalProcessed++;
       });
       
-      // Log progress every 100k decisions
-      if (processedCount % 100000 === 0) {
+      // Log progress every 100k
+      if (totalProcessed % 100000 === 0) {
         const elapsed = (Date.now() - startTime) / 1000;
-        console.log(`✅ Trained on ${processedCount.toLocaleString()} diverse resume patterns (${Math.round((processedCount / simulatedDecisions.length) * 100)}%) in ${elapsed.toFixed(1)}s`);
+        console.log(`✅ Trained on ${totalProcessed.toLocaleString()} patterns (${Math.round((totalProcessed / totalToTrain) * 100)}%) in ${elapsed.toFixed(1)}s`);
       }
     }
     
     // Decay learning rate slightly after pre-training
     this.learningRate *= 0.98;
     const totalTime = (Date.now() - startTime) / 1000;
-    console.log(`🏆 RL Agent Pre-training COMPLETE: ${simulatedDecisions.length.toLocaleString()} diverse resumes trained in ${totalTime.toFixed(1)}s`);
-    console.log(`📊 Agent now understands full quality spectrum: Terrible→Poor→Average→Good→Excellent`);
+    console.log(`🏆 RL Agent Pre-training COMPLETE: ${totalToTrain.toLocaleString()} diverse resumes trained in ${totalTime.toFixed(1)}s`);
+    console.log(`📊 Agent understands: Elite→Excellent→Strong→Good→Average→Below Avg→Poor→Terrible tiers`);
   }
 
   /**
