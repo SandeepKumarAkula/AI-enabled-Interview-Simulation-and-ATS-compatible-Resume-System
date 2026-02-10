@@ -72,8 +72,15 @@ const buildSkillRegex = (skill: string) => {
   return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i")
 }
 
-const findSkillEvidence = (lines: string[], skill: string, max = 2) =>
-  findMatchingLines(lines, buildSkillRegex(skill), max)
+const findSkillEvidence = (lines: string[], skill: string, max = 2) => {
+  // CRITICAL FIX: Skip header/contact lines - evidence should come from work content
+  const contentLines = lines.filter((line, idx) => {
+    if (idx < 10) return false // Skip header (~10 lines)
+    if (line.length < 15) return false // Skip very short lines
+    return true
+  })
+  return findMatchingLines(contentLines, buildSkillRegex(skill), max)
+}
 
 const ACTION_VERB_PATTERN = /\b(achieved|built|created|designed|developed|implemented|improved|led|managed|optimized|engineered|launched|delivered|owned|spearheaded|mentored|automated|streamlined|reduced|increased)\b/i
 
@@ -543,6 +550,12 @@ const generateAISuggestions = async (
       ? bulletDescriptions.reduce((sum, b) => sum + b.replace(BULLET_PATTERN, '').trim().length, 0) / bulletDescriptions.length 
       : 0
 
+    // CRITICAL FIX: Better bullet detection
+    // If bulletDescriptions is empty but we detected multiple sections, 
+    // bullets probably exist but weren't parsed correctly - don't say "no bullets"
+    const hasBulletsInResume = /[-•*►▪·]|\d+\.|\d+\)/.test(resumeText) || bulletDescriptions.length > 0
+    const hasMultipleSections = presentSections.length > 3
+
     const structureSuggestions = [
       presentSections.length > 0
         ? `Detected ${presentSections.length} key sections: ${presentSections.join(" → ")}`
@@ -551,9 +564,12 @@ const generateAISuggestions = async (
         ? `Missing recommended sections: ${missingSections.join(", ")}.`
         : "All core resume sections are present.",
       `Structure validation: ${analysisData.validationScore}% completeness. ${analysisData.validationScore >= 80 ? "Excellent parsing compatibility." : "Some sections may be missing or poorly labeled."}`,
+      // CRITICAL: Only report specific bullet count if we actually parsed them; otherwise use conservative message
       bulletDescriptions.length > 0
-        ? `${bulletDescriptions.length} descriptive bullet points found. Average length: ${Math.round(accurateAvgBulletLength)} characters - ${accurateAvgBulletLength > 150 ? "detailed and comprehensive" : bulletDescriptions.length >= 5 ? "moderate depth" : "consider expanding descriptions"}.`
-        : "No bullet-point descriptions detected. Add concise bullet statements under each role or project."
+        ? `${bulletDescriptions.length} descriptive bullet points found. Average length: ${Math.round(accurateAvgBulletLength)} characters - ${accurateAvgBulletLength > 150 ? "detailed and comprehensive" : bulletDescriptions.length >= 5 ? "moderate depth" : "consider expanding where possible"}.`
+        : (hasBulletsInResume && hasMultipleSections)
+          ? `Bullet-formatted content detected. Structure is well-organized with clear sections.`
+          : "Consider adding bullet points to highlight key achievements and responsibilities."
     ]
     
     suggestions.push({

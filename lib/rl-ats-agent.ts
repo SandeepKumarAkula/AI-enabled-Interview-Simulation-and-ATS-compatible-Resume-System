@@ -359,6 +359,19 @@ export class AIAgentEngine {
     
     const adjustedFeatureScore = Math.min(baseFeatureScore * penaltyMultiplier, 1.0);
     
+    // CRITICAL DEBUG: Log the feature calculation
+    console.log(`[RL AGENT DEBUG] Feature Calculation:`, {
+      technicalScore: features.technicalScore,
+      experienceYears: features.experienceYears,
+      communicationScore: features.communicationScore,
+      leadershipScore: features.leadershipScore,
+      cultureFitScore: features.cultureFitScore,
+      educationLevel: features.educationLevel,
+      baseFeatureScore,
+      penaltyMultiplier,
+      adjustedFeatureScore
+    });
+    
     // CRITICAL: Make decision DIRECTLY from adjusted feature score
     // This is what matters - not Q-table nonsense
     // Q-values only used for optional learning history, not decisions
@@ -366,23 +379,47 @@ export class AIAgentEngine {
     let action: 'hire' | 'reject' | 'consider';
     let confidenceScore: number;
     
+    // SAFEGUARD: If adjusted feature score is suspiciously low but other factors are high,
+    // recalculate using only good scores (avoid false negatives from missing data)
+    let decisionScore = adjustedFeatureScore;
+    if (adjustedFeatureScore < 0.40 && (features.technicalScore > 50 || features.communicationScore > 70)) {
+      // Poor calculation likely due to missing experience data - recalculate without experience weight
+      const altScore = (
+        (features.technicalScore / 100) * 0.35 +           // Increase tech weight
+        (features.communicationScore / 100) * 0.25 +       // Increase comm weight
+        (features.cultureFitScore / 100) * 0.20 +          // Increase culture weight
+        (features.educationLevel / 10) * 0.15 +            // Increase education weight
+        (features.leadershipScore / 100) * 0.05            // Keep leadership low
+      );
+      console.log(`[RL AGENT DEBUG] Alternative score calculated: ${altScore} (using alt weights)`);
+      decisionScore = Math.max(adjustedFeatureScore, altScore);
+    }
+    
     // Simple, clear decision logic based on resume quality
-    if (adjustedFeatureScore >= 0.72) {
+    if (decisionScore >= 0.72) {
       // Excellent resume - HIRE
       action = 'hire';
-      confidenceScore = Math.min(1.0, adjustedFeatureScore);
-    } else if (adjustedFeatureScore >= 0.50) {
+      confidenceScore = Math.min(1.0, decisionScore);
+    } else if (decisionScore >= 0.50) {
       // Good resume - CONSIDER
       action = 'consider';
-      confidenceScore = adjustedFeatureScore * 0.9;
-    } else if (adjustedFeatureScore >= 0.30) {
+      confidenceScore = decisionScore * 0.9;
+    } else if (decisionScore >= 0.30) {
       // Weak but not terrible - CONSIDER (give chance)
       action = 'consider';
-      confidenceScore = adjustedFeatureScore * 0.6;
+      confidenceScore = decisionScore * 0.6;
     } else {
       // Very weak - REJECT
       action = 'reject';
-      confidenceScore = Math.min(0.7, (1 - adjustedFeatureScore) * 0.8);
+      confidenceScore = Math.min(0.7, (1 - decisionScore) * 0.8);
+    }
+    
+    // FINAL SAFEGUARD: If technical OR communication score is very high (>75),
+    // never give a REJECT decision - at worst CONSIDER
+    if ((features.technicalScore > 75 || features.communicationScore > 75) && action === 'reject') {
+      action = 'consider';
+      confidenceScore = Math.max(0.5, decisionScore);
+      console.log(`[RL AGENT DEBUG] Safeguard triggered: Upgraded REJECT to CONSIDER due to high individual score`);
     }
     
     // Emergency override: if exploration rate triggers, add randomness
