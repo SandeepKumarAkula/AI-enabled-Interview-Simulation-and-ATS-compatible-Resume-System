@@ -162,10 +162,10 @@ export class AIAgentEngine {
    * COMPREHENSIVE: Uses 1M samples covering all resume quality spectrum
    */
   private preTrainOnSimulatedData(): void {
-    // Simulate 1,000,000+ diverse hiring decisions
-    // This represents training across the FULL quality spectrum from terrible (score 20) to excellent (score 95)
-    console.log('🚀 Training RL agent on 1 MILLION diverse resume patterns covering ALL quality types...');
-    const simulatedDecisions = this.generateSimulatedHiringData(1000000);
+    // Simulate 5,000,000+ diverse hiring decisions with enhanced edge cases
+    // This represents training across the FULL quality spectrum with massive variation in ALL dimensions
+    console.log('🚀 Training RL agent on 5 MILLION diverse resume patterns covering ALL quality types + edge cases...');
+    const simulatedDecisions = this.generateSimulatedHiringData(5000000);
     
     // Train on simulated data in batches for efficiency
     let processedCount = 0;
@@ -209,43 +209,78 @@ export class AIAgentEngine {
   }> {
     const data: Array<any> = [];
     
-    // COMPREHENSIVE: Define 25+ distribution patterns covering FULL spectrum (20-95 scores)
-    // CRITICAL: Provides diversity in ALL dimensions so agent doesn't get locked into narrow range
+    // ULTRA-COMPREHENSIVE: Define 50+ distribution patterns covering FULL spectrum (15-99 scores)
+    // CRITICAL: Massive diversity in ALL dimensions - edge cases, industry variants, special conditions
     const distributions = [
-      // EXCELLENT TIER (scores 85-95)
-      { tech: [85, 98], exp: [8, 20], edu: [7, 10], comm: [70, 90], lead: [55, 80], cult: [65, 90], weight: 0.04, label: 'Principal/Staff' },
-      { tech: [80, 95], exp: [5, 15], edu: [7, 10], comm: [60, 85], lead: [45, 75], cult: [60, 88], weight: 0.03, label: 'Specialist' },
-      { tech: [70, 90], exp: [7, 12], edu: [5, 9], comm: [70, 92], lead: [60, 85], cult: [68, 92], weight: 0.06, label: 'Senior Strong' },
-      { tech: [65, 85], exp: [8, 15], edu: [6, 10], comm: [75, 95], lead: [75, 95], cult: [75, 95], weight: 0.04, label: 'Senior Leader' },
+      // ELITE TIER (scores 90-99) - Top 0.5% candidates
+      { tech: [92, 99], exp: [12, 25], edu: [9, 10], comm: [85, 98], lead: [80, 95], cult: [85, 98], weight: 0.005, label: 'Executive Senior Principal' },
+      { tech: [90, 98], exp: [10, 20], edu: [9, 10], comm: [80, 95], lead: [75, 92], cult: [80, 95], weight: 0.008, label: 'Distinguished Expert' },
+      { tech: [88, 97], exp: [8, 18], edu: [8, 10], comm: [85, 96], lead: [80, 95], cult: [82, 96], weight: 0.005, label: 'Industry Thought Leader' },
       
-      // GOOD TIER (scores 70-85)
-      { tech: [70, 90], exp: [3, 7], edu: [6, 9], comm: [65, 90], lead: [50, 80], cult: [65, 92], weight: 0.08, label: 'Strong Mid-level' },
-      { tech: [55, 80], exp: [3, 6], edu: [5, 8], comm: [55, 85], lead: [40, 70], cult: [60, 88], weight: 0.12, label: 'Mid-level Standard' },
-      { tech: [65, 85], exp: [1, 3], edu: [6, 9], comm: [60, 85], lead: [40, 65], cult: [65, 90], weight: 0.05, label: 'High Performer Junior' },
-      { tech: [70, 90], exp: [0, 1], edu: [8, 10], comm: [65, 85], lead: [30, 55], cult: [70, 90], weight: 0.02, label: 'Exceptional Fresher' },
+      // EXCELLENT TIER (scores 85-90)
+      { tech: [85, 95], exp: [8, 15], edu: [7, 10], comm: [80, 92], lead: [75, 90], cult: [78, 92], weight: 0.015, label: 'Principal/Staff' },
+      { tech: [82, 93], exp: [6, 14], edu: [7, 10], comm: [75, 88], lead: [70, 85], cult: [75, 90], weight: 0.02, label: 'Senior Architect' },
+      { tech: [80, 92], exp: [5, 12], edu: [7, 10], comm: [70, 85], lead: [65, 82], cult: [70, 88], weight: 0.018, label: 'Specialist Expert' },
+      { tech: [78, 90], exp: [7, 14], edu: [6, 9], comm: [75, 90], lead: [70, 88], cult: [75, 90], weight: 0.015, label: 'Senior Leader' },
+      { tech: [75, 88], exp: [8, 16], edu: [7, 10], comm: [78, 92], lead: [78, 92], cult: [80, 95], weight: 0.012, label: 'Director of Technology' },
+      
+      // STRONG TIER (scores 75-85)
+      { tech: [75, 88], exp: [4, 10], edu: [6, 9], comm: [70, 88], lead: [60, 80], cult: [70, 88], weight: 0.025, label: 'Senior Engineer Strong' },
+      { tech: [72, 85], exp: [3, 8], edu: [6, 9], comm: [65, 85], lead: [55, 75], cult: [68, 86], weight: 0.028, label: 'Mid-Senior Professional' },
+      { tech: [70, 85], exp: [5, 12], edu: [6, 10], comm: [72, 88], lead: [65, 85], cult: [70, 88], weight: 0.02, label: 'Experienced Manager' },
+      { tech: [68, 82], exp: [4, 9], edu: [6, 9], comm: [68, 85], lead: [58, 80], cult: [65, 85], weight: 0.025, label: 'Senior IC Strong' },
+      { tech: [65, 80], exp: [6, 14], edu: [5, 9], comm: [70, 88], lead: [65, 85], cult: [68, 87], weight: 0.018, label: 'Tech Lead' },
+      
+      // GOOD TIER (scores 70-75)
+      { tech: [70, 85], exp: [3, 7], edu: [6, 9], comm: [65, 80], lead: [50, 75], cult: [65, 85], weight: 0.035, label: 'Strong Mid-level' },
+      { tech: [65, 80], exp: [2, 6], edu: [5, 9], comm: [60, 80], lead: [45, 70], cult: [60, 82], weight: 0.042, label: 'Mid-level Professional' },
+      { tech: [68, 82], exp: [3, 7], edu: [6, 9], comm: [65, 82], lead: [52, 75], cult: [62, 84], weight: 0.03, label: 'Project Lead' },
+      { tech: [70, 82], exp: [1, 4], edu: [7, 10], comm: [65, 82], lead: [42, 68], cult: [68, 85], weight: 0.025, label: 'High Performer Junior' },
+      { tech: [72, 84], exp: [0.5, 2], edu: [8, 10], comm: [68, 85], lead: [35, 62], cult: [72, 88], weight: 0.016, label: 'Exceptional Fresher' },
+      { tech: [60, 75], exp: [3, 8], edu: [6, 9], comm: [68, 85], lead: [58, 78], cult: [65, 85], weight: 0.022, label: 'Specialist IC' },
+      { tech: [62, 78], exp: [5, 10], edu: [6, 10], comm: [65, 82], lead: [55, 75], cult: [62, 83], weight: 0.025, label: 'Senior Specialist' },
       
       // AVERAGE TIER (scores 50-70)
-      { tech: [40, 70], exp: [1, 3], edu: [5, 8], comm: [45, 80], lead: [20, 55], cult: [55, 85], weight: 0.10, label: 'Junior Standard' },
-      { tech: [35, 65], exp: [0, 1], edu: [7, 10], comm: [50, 75], lead: [15, 40], cult: [60, 85], weight: 0.08, label: 'Fresher Standard' },
-      { tech: [40, 70], exp: [0, 3], edu: [6, 10], comm: [60, 85], lead: [35, 65], cult: [55, 85], weight: 0.03, label: 'Career Changer Strong' },
-      { tech: [50, 75], exp: [8, 18], edu: [5, 8], comm: [55, 80], lead: [50, 75], cult: [50, 80], weight: 0.02, label: 'Overqualified Gaps' },
-      { tech: [60, 80], exp: [2, 6], edu: [5, 8], comm: [50, 75], lead: [35, 60], cult: [50, 80], weight: 0.05, label: 'Mid-level Average' },
+      { tech: [55, 75], exp: [2, 5], edu: [5, 8], comm: [55, 75], lead: [40, 65], cult: [55, 80], weight: 0.045, label: 'Junior IC Standard' },
+      { tech: [50, 70], exp: [0.5, 2], edu: [6, 9], comm: [55, 75], lead: [30, 55], cult: [58, 80], weight: 0.038, label: 'Fresher Graduate' },
+      { tech: [52, 72], exp: [1, 4], edu: [5, 9], comm: [50, 72], lead: [35, 60], cult: [52, 78], weight: 0.032, label: 'Junior Engineer' },
+      { tech: [45, 68], exp: [0, 2], edu: [7, 10], comm: [55, 78], lead: [28, 55], cult: [58, 82], weight: 0.028, label: 'Graduate Strong' },
+      { tech: [50, 70], exp: [1, 5], edu: [5, 8], comm: [60, 80], lead: [45, 70], cult: [62, 85], weight: 0.022, label: 'Career Changer Solid' },
+      { tech: [58, 75], exp: [8, 16], edu: [4, 7], comm: [50, 70], lead: [50, 72], cult: [48, 72], weight: 0.015, label: 'Overqualified Dev' },
+      { tech: [48, 68], exp: [2, 6], edu: [4, 8], comm: [52, 75], lead: [38, 65], cult: [50, 78], weight: 0.028, label: 'Mid-level Average' },
+      { tech: [45, 65], exp: [3, 8], edu: [5, 8], comm: [48, 70], lead: [40, 65], cult: [45, 75], weight: 0.025, label: 'Senior IC Average' },
       
-      // POOR TIER (scores 30-50)
-      { tech: [25, 55], exp: [0, 4], edu: [5, 8], comm: [45, 75], lead: [25, 55], cult: [45, 75], weight: 0.04, label: 'Weak Career Changer' },
-      { tech: [85, 98], exp: [3, 10], edu: [7, 10], comm: [30, 55], lead: [20, 50], cult: [40, 70], weight: 0.02, label: 'Tech Genius Low Comm' },
-      { tech: [40, 65], exp: [2, 8], edu: [5, 8], comm: [75, 92], lead: [65, 88], cult: [80, 95], weight: 0.02, label: 'Culture Champion' },
-      { tech: [35, 60], exp: [1, 4], edu: [4, 7], comm: [40, 65], lead: [25, 50], cult: [45, 70], weight: 0.03, label: 'Junior Weak' },
-      { tech: [20, 50], exp: [2, 8], edu: [4, 7], comm: [35, 60], lead: [20, 45], cult: [40, 65], weight: 0.02, label: 'Irrelevant Experience' },
-      { tech: [30, 55], exp: [0, 2], edu: [4, 7], comm: [30, 55], lead: [20, 40], cult: [35, 60], weight: 0.03, label: 'Fresher Weak' },
+      // BELOW AVERAGE TIER (scores 40-50)
+      { tech: [40, 60], exp: [1, 4], edu: [4, 7], comm: [45, 68], lead: [30, 55], cult: [45, 70], weight: 0.028, label: 'Struggling Junior' },
+      { tech: [38, 58], exp: [0, 2], edu: [5, 8], comm: [48, 70], lead: [25, 50], cult: [50, 75], weight: 0.022, label: 'Below Average Fresher' },
+      { tech: [42, 62], exp: [2, 6], edu: [4, 7], comm: [50, 72], lead: [42, 65], cult: [52, 78], weight: 0.018, label: 'Career Changer Weak' },
+      { tech: [35, 55], exp: [0, 3], edu: [6, 9], comm: [55, 75], lead: [35, 60], cult: [60, 80], weight: 0.015, label: 'Non-Tech Strong Comm' },
+      { tech: [48, 68], exp: [8, 18], edu: [3, 6], comm: [45, 65], lead: [48, 70], cult: [45, 68], weight: 0.012, label: 'Outdated Senior' },
       
-      // TERRIBLE TIER (scores 20-35)
-      { tech: [10, 35], exp: [0, 2], edu: [3, 6], comm: [20, 45], lead: [10, 30], cult: [30, 55], weight: 0.03, label: 'Unqualified Poor Comm' },
-      { tech: [15, 40], exp: [0, 3], edu: [4, 7], comm: [25, 50], lead: [15, 35], cult: [35, 60], weight: 0.02, label: 'Minimal Effort' },
-      { tech: [12, 30], exp: [0, 4], edu: [3, 6], comm: [30, 55], lead: [12, 35], cult: [32, 58], weight: 0.01, label: 'No Skills' },
-      { tech: [18, 42], exp: [1, 5], edu: [4, 7], comm: [22, 48], lead: [15, 38], cult: [28, 52], weight: 0.01, label: 'Poor Formatting' },
-      { tech: [8, 25], exp: [0, 1], edu: [2, 5], comm: [18, 40], lead: [8, 25], cult: [25, 50], weight: 0.01, label: 'Extremely Underqualified' },
-      { tech: [5, 20], exp: [0, 1], edu: [2, 4], comm: [15, 35], lead: [5, 20], cult: [20, 40], weight: 0.005, label: 'Complete Mismatch' }
+      // POOR TIER (scores 25-40)
+      { tech: [28, 48], exp: [0, 2], edu: [3, 6], comm: [35, 58], lead: [20, 45], cult: [38, 65], weight: 0.02, label: 'Junior Below Average' },
+      { tech: [25, 45], exp: [1, 4], edu: [4, 7], comm: [40, 65], lead: [30, 55], cult: [42, 70], weight: 0.016, label: 'Career Changer Poor' },
+      { tech: [32, 52], exp: [2, 8], edu: [4, 7], comm: [50, 72], lead: [55, 78], cult: [58, 82], weight: 0.008, label: 'Culture Champion' },
+      { tech: [35, 55], exp: [1, 5], edu: [3, 6], comm: [35, 55], lead: [20, 40], cult: [40, 65], weight: 0.014, label: 'Weak Overall Profile' },
+      { tech: [28, 48], exp: [3, 10], edu: [3, 6], comm: [35, 55], lead: [35, 55], cult: [35, 60], weight: 0.01, label: 'Limited Skills Experience' },
+      { tech: [85, 96], exp: [4, 12], edu: [6, 9], comm: [25, 45], lead: [15, 35], cult: [32, 58], weight: 0.008, label: 'Tech Expert Low Comm' },
+      
+      // TERRIBLE TIER (scores 15-25)
+      { tech: [15, 35], exp: [0, 2], edu: [2, 5], comm: [20, 40], lead: [10, 30], cult: [25, 50], weight: 0.012, label: 'Minimal Skills' },
+      { tech: [12, 32], exp: [0, 3], edu: [3, 6], comm: [25, 45], lead: [12, 32], cult: [28, 52], weight: 0.002, label: 'Effort Low' },
+      { tech: [10, 30], exp: [0, 5], edu: [2, 5], comm: [25, 48], lead: [10, 33], cult: [28, 55], weight: 0.003, label: 'Unqualified' },
+      { tech: [18, 38], exp: [1, 6], edu: [2, 5], comm: [18, 40], lead: [12, 35], cult: [22, 48], weight: 0.002, label: 'Poor Presentation' },
+      { tech: [8, 28], exp: [0, 1], edu: [2, 4], comm: [15, 35], lead: [8, 25], cult: [20, 42], weight: 0.002, label: 'Extremely Weak' },
+      { tech: [5, 22], exp: [0, 1], edu: [1, 4], comm: [12, 32], lead: [5, 20], cult: [18, 38], weight: 0.001, label: 'Complete Mismatch' },
+      
+      // EDGE CASES & SPECIAL CONDITIONS
+      { tech: [75, 88], exp: [0, 0.5], edu: [9, 10], comm: [70, 85], lead: [40, 65], cult: [68, 85], weight: 0.008, label: 'Rapid Learner Prodigy' },
+      { tech: [72, 86], exp: [6, 10], edu: [8, 10], comm: [75, 90], lead: [70, 88], cult: [75, 90], weight: 0.01, label: 'Well-Educated Professional' },
+      { tech: [68, 82], exp: [10, 20], edu: [3, 6], comm: [70, 85], lead: [68, 85], cult: [70, 88], weight: 0.008, label: 'Self-Taught Veteran' },
+      { tech: [55, 72], exp: [2, 5], edu: [5, 8], comm: [75, 90], lead: [65, 85], cult: [75, 90], weight: 0.012, label: 'Great Communicator' },
+      { tech: [65, 80], exp: [3, 8], edu: [5, 9], comm: [40, 65], lead: [35, 60], cult: [40, 68], weight: 0.006, label: 'Brilliant Introvert' },
+      { tech: [45, 65], exp: [1, 4], edu: [9, 10], comm: [58, 78], lead: [42, 65], cult: [60, 80], weight: 0.008, label: 'Academic Fresh Graduate' },
+      { tech: [32, 52], exp: [8, 15], edu: [9, 10], comm: [65, 82], lead: [60, 80], cult: [65, 85], weight: 0.005, label: 'Career Shifter Academic' }
     ];
 
     
