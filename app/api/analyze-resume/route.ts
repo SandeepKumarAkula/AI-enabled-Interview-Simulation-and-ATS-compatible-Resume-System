@@ -339,21 +339,20 @@ const generateAISuggestions = async (
     }
 
     // 2. TONE SUGGESTIONS - Based on actual problematic language found
-    if (analysisData.passiveVerbs && analysisData.passiveVerbs.length > 0) {
-      const examplePassive = analysisData.passiveVerbs[0]?.substring(0, 80) || "passive construction"
-      const casualWordsStr = analysisData.casualWords.length > 0 ? analysisData.casualWords.join(", ") : "casual language"
-      
-      // Generate suggestions based on what we actually found
-      const actionVerbs = ["Engineered", "Architected", "Orchestrated", "Transformed", "Accelerated", "Pioneered", "Maximized", "Optimized"]
-      const randomAction = process.env.AI_DETERMINISTIC === '1' ? actionVerbs[0] : actionVerbs[Math.floor(Math.random() * actionVerbs.length)]
-      
-      const toneSuggestions = [
-        `Passive voice detected: "${examplePassive}" - Replace with stronger action: "${randomAction} the process by..."`,
-        `Tone confidence at ${analysisData.toneConfidence}% - target professional tone uses powerful action verbs 80%+ of the time.`,
-        analysisData.casualWords.length > 0 ? `Casual language found: "${casualWordsStr}" - Use industry-standard terminology instead.` : "Your language tone is appropriately professional.",
-        `Impact: Strong action verbs increase resume readability by ATS and human recruiters by 35%.`
-      ]
-      
+    if ((analysisData.passiveVerbs && analysisData.passiveVerbs.length > 0) || (analysisData.casualWords && analysisData.casualWords.length > 0)) {
+      const examplePassive = analysisData.passiveVerbs?.[0]?.substring(0, 80)
+      const casualWordsStr = analysisData.casualWords && analysisData.casualWords.length > 0 ? analysisData.casualWords.join(", ") : ""
+      const actionVerb = "Engineered"
+
+      const toneSuggestions = [] as string[]
+      if (examplePassive) {
+        toneSuggestions.push(`Passive voice detected: "${examplePassive}" - Replace with stronger action: "${actionVerb} the process by..."`)
+      }
+      toneSuggestions.push(`Tone confidence at ${analysisData.toneConfidence}% - target professional tone uses strong action verbs consistently.`)
+      if (casualWordsStr) {
+        toneSuggestions.push(`Casual language found: "${casualWordsStr}" - Use industry-standard terminology instead.`)
+      }
+
       suggestions.push({
         category: `Professional Language (${analysisData.toneConfidence}% confidence)`,
         suggestions: toneSuggestions
@@ -395,13 +394,14 @@ const generateAISuggestions = async (
         suggestions: formatSuggestions
       })
     } else {
+      const hasBullets = bulletPoints.length > 0
       suggestions.push({
         category: "Formatting Status",
         suggestions: [
-          `✅ Your resume uses ATS-compatible formatting: standard bullets (•, -) throughout.`,
+          hasBullets ? `✅ Your resume uses ATS-compatible formatting: standard bullets (•, -) throughout.` : "ATS-compatible formatting detected with no special symbols.",
           `Cleanliness score: 100% - No parsing barriers for automated systems.`,
-          `All ${bulletPoints.length} bullet points are properly formatted for ATS readers.`,
-          `Continue using this formatting pattern - this is a competitive advantage.`
+          hasBullets ? `All ${bulletPoints.length} bullet points are properly formatted for ATS readers.` : "No bullet points detected - consider using bullets to improve scanability.",
+          `Continue using this formatting pattern for ATS compatibility.`
         ]
       })
     }
@@ -425,7 +425,9 @@ const generateAISuggestions = async (
       `Detected ${presentSections.length} key sections: ${presentSections.join(" → ")}`,
       presentSections.length >= 3 ? `Your section order is ATS-optimal. Recruiters scan: Summary (first 15 seconds) → Experience → Skills.` : `Consider adding missing sections: typically Resume should have Work Experience, Education, and Skills at minimum.`,
       `Structure validation: ${analysisData.validationScore}% completeness. ${analysisData.validationScore >= 80 ? "Excellent parsing compatibility." : "Some sections may be missing or poorly labeled."}`,
-      `Average bullet description length: ${Math.round(avgBulletLength)} characters - ${avgBulletLength > 150 ? "descriptions are detailed and impactful" : "consider adding more detail to bullets"}.`
+      bulletPoints.length > 0
+        ? `Average bullet description length: ${Math.round(avgBulletLength)} characters - ${avgBulletLength > 150 ? "descriptions are detailed and impactful" : "consider adding more detail to bullets"}.`
+        : "No bullet points detected - add concise bullet statements under each role or project."
     ]
     
     suggestions.push({
@@ -731,9 +733,17 @@ const analyzeSpecificIssues = (text: string): {
   casualWords: string[]
 } => {
   const specialCharSymbols = ['◆', '■', '★', '↑', '→', '←', '↓', '♦', '✓', '✗', '●', '○']
-  const passiveVerbs = ['was', 'were', 'been', 'be', 'is', 'are', 'am']
+  const passiveVoicePattern = /\b(is|are|was|were|be|been|being)\b\s+\w+(ed|en)\b/i
   const casualLanguage = ['like', 'cool', 'awesome', 'basically', 'really', 'very', 'pretty', 'quite']
-  const metricPatterns = /(\d+%|\$[\d,]+|[\d,]+ (users|customers|clients|projects|team members|people))/gi
+  const metricPattern = /(\d+%|\$[\d,]+|[\d,]+\s*(users|customers|clients|projects|team members|people))/i
+
+  const isContactLine = (line: string): boolean => {
+    const emailPattern = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/
+    const phonePattern = /(\+?\d{1,3}[\s.-]?)?(\(?\d{2,4}\)?[\s.-]?)?\d{3,4}[\s.-]?\d{3,4}/
+    const urlPattern = /(https?:\/\/|www\.)/i
+    const hasSeparators = line.includes('|')
+    return emailPattern.test(line) || phonePattern.test(line) || urlPattern.test(line) || hasSeparators
+  }
 
   // Find special characters used
   const foundSpecialChars = new Set<string>()
@@ -745,15 +755,15 @@ const analyzeSpecificIssues = (text: string): {
 
   // Find lines with passive voice
   const lines = text.split('\n')
-  const passiveLines = lines.filter(line => 
-    passiveVerbs.some(verb => line.toLowerCase().includes(` ${verb} `))
-  ).slice(0, 3)
+  const passiveLines = lines
+    .filter(line => line.length > 20 && passiveVoicePattern.test(line) && !isContactLine(line))
+    .slice(0, 3)
 
   // Find lines without metrics
   const linesWithoutMetrics = lines
-    .filter((line, idx) => {
+    .filter((line) => {
       const hasBullet = line.trim().startsWith('-') || line.trim().startsWith('•')
-      const hasMetric = metricPatterns.test(line)
+      const hasMetric = metricPattern.test(line)
       return hasBullet && !hasMetric && line.length > 20
     })
     .slice(0, 3)

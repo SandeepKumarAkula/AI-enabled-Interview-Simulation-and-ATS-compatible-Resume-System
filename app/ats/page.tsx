@@ -182,33 +182,56 @@ export default function ATSPage() {
 
     // Get RL agent analysis
     const rlDecision = aiData?.rlAgentDecision
-    if (rlDecision && rlDecision.reasoning) {
-      // Parse RL agent reasoning to extract key points
-      const reasoning = rlDecision.reasoning
-      
-      // Extract strengths from reasoning
-      if (reasoning.includes("Strengths:")) {
-        const strengthsPart = reasoning.split("Strengths:")[1]?.split(".")[0]
-        if (strengthsPart) {
-          strengths.push(`🤖 AI Agent: ${strengthsPart.trim()}`)
-        }
+    const richFeatures = rlDecision?.features || {}
+    
+    if (rlDecision) {
+      // Build strengths from actual feature scores
+      if (richFeatures.technicalScore >= 75) {
+        strengths.push(`✓ Strong technical background (Score: ${richFeatures.technicalScore}/100)`)
+      }
+      if (richFeatures.leadershipScore >= 70) {
+        strengths.push(`✓ Demonstrated leadership experience (Score: ${richFeatures.leadershipScore}/100)`)
+      }
+      if (richFeatures.communicationScore >= 70) {
+        strengths.push(`✓ Professional communication skills (Score: ${richFeatures.communicationScore}/100)`)
+      }
+      if (richFeatures.experienceYears >= 5) {
+        strengths.push(`✓ Substantial work experience (${richFeatures.experienceYears} years)`)
+      }
+      if (richFeatures.educationLevel >= 7) {
+        strengths.push(`✓ Advanced education credentials (Level: ${richFeatures.educationLevel}/10)`)
       }
       
-      // Extract areas to improve
-      if (reasoning.includes("Areas to improve:")) {
-        const weaknessPart = reasoning.split("Areas to improve:")[1]?.split(".")[0]
-        if (weaknessPart) {
-          weaknesses.push(`🤖 AI Agent: ${weaknessPart.trim()}`)
-        }
+      // Build weaknesses from low scores
+      if (richFeatures.technicalScore < 60) {
+        weaknesses.push(`✕ Technical skills need development (Score: ${richFeatures.technicalScore}/100)`)
+      }
+      if (richFeatures.communicationScore < 60) {
+        weaknesses.push(`✕ Communication could be improved (Score: ${richFeatures.communicationScore}/100)`)
+      }
+      if (richFeatures.experienceYears < 2) {
+        weaknesses.push(`✕ Early career stage (${richFeatures.experienceYears} years experience)`)
+      }
+      if (richFeatures.leadershipScore < 40) {
+        weaknesses.push(`✕ Limited leadership experience shown in resume`)
       }
       
-      // Add decision summary
+      // Add decision summary with reasoning
       if (rlDecision.decision === 'HIRE') {
-        strengths.push(`AI Decision: HIRE with ${rlDecision.confidence} confidence`)
+        strengths.push(`🤖 AI Decision: HIRE | Confidence: ${rlDecision.confidence}`)
+        if (rlDecision.reasoning) {
+          strengths.push(`Reasoning: ${rlDecision.reasoning}`)
+        }
       } else if (rlDecision.decision === 'REJECT') {
-        weaknesses.push(`❌ AI Decision: REJECT with ${rlDecision.confidence} confidence`)
+        weaknesses.push(`❌ AI Decision: REJECT | Confidence: ${rlDecision.confidence}`)
+        if (rlDecision.reasoning) {
+          weaknesses.push(`Reasoning: ${rlDecision.reasoning}`)
+        }
       } else {
-        weaknesses.push(`⚠️ AI Decision: CONSIDER (${rlDecision.confidence} confidence) - needs improvement`)
+        weaknesses.push(`⚠️ AI Decision: CONSIDER | Confidence: ${rlDecision.confidence}`)
+        if (rlDecision.reasoning) {
+          weaknesses.push(`Reasoning: ${rlDecision.reasoning}`)
+        }
       }
     }
 
@@ -239,8 +262,8 @@ export default function ATSPage() {
     
     return {
       score: Math.round(finalScore),
-      strengths: strengths.length > 0 ? strengths : ["AI analysis in progress"],
-      weaknesses: weaknesses.length > 0 ? weaknesses : ["Analyzing resume..."],
+      strengths: strengths.length > 0 ? strengths : ["Resume analysis complete"],
+      weaknesses: weaknesses.length > 0 ? weaknesses : ["No major issues detected"],
       improvements: aiSuggestions,
       keywordMatches: { matched, missing },
       formatting: formatScore as any,
