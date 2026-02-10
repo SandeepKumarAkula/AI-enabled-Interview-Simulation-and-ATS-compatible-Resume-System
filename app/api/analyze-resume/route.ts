@@ -580,7 +580,33 @@ const generateAISuggestions = async (
       suggestions: structureSuggestions
     })
 
-    // 6. JOB MATCH SUGGESTIONS - Only if job description provided
+    // 6. SCORE DRIVERS - Industry-standard breakdown
+    if (analysisData.industryScoreBreakdown) {
+      const d = analysisData.industryScoreBreakdown
+      const drivers = [
+        { label: 'Parsing', score: d.parsing },
+        { label: 'Content Quality', score: d.content },
+        { label: 'Relevance', score: d.relevance },
+        { label: 'Skills', score: d.skills },
+        { label: 'Experience', score: d.experience },
+        { label: 'Impact', score: d.impact },
+        { label: 'Clarity', score: d.clarity },
+      ]
+      drivers.sort((a, b) => b.score - a.score)
+      const topDrivers = drivers.slice(0, 2).map(dv => `${dv.label}: ${dv.score}/100`).join(', ')
+      const bottomDrivers = drivers.slice(-2).map(dv => `${dv.label}: ${dv.score}/100`).join(', ')
+
+      suggestions.push({
+        category: 'Score Drivers',
+        suggestions: [
+          `Top strengths: ${topDrivers}.`,
+          `Primary improvement areas: ${bottomDrivers}.`,
+          `Metrics coverage: ${d.metricsCoverage}% of bullet points include measurable results.`
+        ]
+      })
+    }
+
+    // 7. JOB MATCH SUGGESTIONS - Only if job description provided
     if (jobDescription && jobDescription.trim().length > 20) {
       const alignment = Math.round(analysisData.semanticScore * 100)
       const jobSkills = extractSkillsAdvanced(jobDescription)
@@ -614,7 +640,7 @@ const generateAISuggestions = async (
       })
     }
 
-    // 7. EVIDENCE HIGHLIGHTS - Use evidence insights for personalized feedback
+    // 8. EVIDENCE HIGHLIGHTS - Use evidence insights for personalized feedback
     if (analysisData.evidenceInsights) {
       const strengths = (analysisData.evidenceInsights.strengths || []).slice(0, 2)
       const weaknesses = (analysisData.evidenceInsights.weaknesses || []).slice(0, 2)
@@ -1291,6 +1317,45 @@ export async function POST(request: NextRequest) {
       overallAtsScore = Math.round(Math.max(0, Math.min(100, overallAtsScore * lenMul)))
     } catch {}
 
+    // INDUSTRY STANDARD SCORING - deterministic and explainable
+    const resumeLinesForScoring = getResumeLines(resume)
+    const bulletLinesForScoring = resumeLinesForScoring.filter(line => BULLET_PATTERN.test(line))
+    const metricLinesForScoring = bulletLinesForScoring.filter(line => METRIC_PATTERN.test(line))
+    const metricCoverage = bulletLinesForScoring.length > 0
+      ? Math.round((metricLinesForScoring.length / bulletLinesForScoring.length) * 100)
+      : 30
+
+    const parsingScore = Math.max(0, Math.min(100, validationScore || 0))
+    const contentScore = Math.max(0, Math.min(100, resumeQuality.professionalScore || 0))
+    const relevanceScore = Math.max(0, Math.min(100, Math.round(semanticScore * 100)))
+    const skillsScore = jobSkills.length > 0
+      ? Math.max(0, Math.min(100, skillMatchPercentage))
+      : Math.max(0, Math.min(100, detectedSkills.length * 6))
+    const experienceScore = Math.max(0, Math.min(100, Math.round(experienceYears * 10)))
+    const impactScore = Math.max(0, Math.min(100, metricCoverage))
+    const clarityScore = Math.max(0, Math.min(
+      100,
+      Math.round(
+        (resumeTone.score * 100) -
+        (specificIssues.passiveVerbExamples.length * 5) -
+        (specificIssues.casualWords.length * 5) -
+        (specificIssues.specialCharacters.length * 5)
+      )
+    ))
+
+    const industryScore = Math.round(
+      (parsingScore * 0.15) +
+      (contentScore * 0.20) +
+      (relevanceScore * 0.20) +
+      (skillsScore * 0.15) +
+      (experienceScore * 0.15) +
+      (impactScore * 0.10) +
+      (clarityScore * 0.05)
+    )
+
+    // Use industry-standard score as the final overall ATS score
+    overallAtsScore = Math.max(0, Math.min(100, industryScore))
+
     const evidenceInsights = buildEvidenceInsights(resume, detectedSkills, {
       passiveVerbExamples: specificIssues.passiveVerbExamples,
       linesWithoutMetrics: specificIssues.linesWithoutMetrics,
@@ -1315,6 +1380,16 @@ export async function POST(request: NextRequest) {
           semanticScore: semanticScore,
           entities: entities,
           evidenceInsights: evidenceInsights,
+          industryScoreBreakdown: {
+            parsing: parsingScore,
+            content: contentScore,
+            relevance: relevanceScore,
+            skills: skillsScore,
+            experience: experienceScore,
+            impact: impactScore,
+            clarity: clarityScore,
+            metricsCoverage: metricCoverage,
+          },
         }
       )
     } catch (e) {
@@ -1390,6 +1465,17 @@ export async function POST(request: NextRequest) {
           final: ensemble.final,
           agentsUsed: agentScores.length,
           intelligentAgentIncluded: ENABLE_INTELLIGENT ? true : false
+        },
+        industryScoreBreakdown: {
+          parsing: parsingScore,
+          content: contentScore,
+          relevance: relevanceScore,
+          skills: skillsScore,
+          experience: experienceScore,
+          impact: impactScore,
+          clarity: clarityScore,
+          metricsCoverage: metricCoverage,
+          final: overallAtsScore
         },
         
         // 🤖 REINFORCEMENT LEARNING AGENT DECISION
