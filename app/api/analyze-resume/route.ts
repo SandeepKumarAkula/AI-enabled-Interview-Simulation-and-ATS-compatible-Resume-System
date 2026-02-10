@@ -324,8 +324,7 @@ const generateAISuggestions = async (
     // 1. SKILLS SUGGESTIONS - Truly personalized based on actual detected skills
     if (analysisData.skillCount > 0) {
       const topSkills = analysisData.detectedSkills.slice(0, 5)
-      const skillGap = analysisData.detectedSkills.length - 10
-      
+
       const skillSuggestions = [
         `Your top 5 detected skills are: ${topSkills.join(", ")}. These should be prominently featured in your summary or skills section.`,
         `With ${analysisData.skillCount} total skills detected, consider grouping them by category: Programming Languages, Frameworks, Tools, Methodologies.`,
@@ -421,9 +420,21 @@ const generateAISuggestions = async (
       hasCertifications && "Certifications"
     ].filter(Boolean)
     
+    const missingSections = [
+      !hasExperience && "Work Experience",
+      !hasEducation && "Education",
+      !hasSkills && "Skills",
+      !hasProjects && "Projects",
+      !hasCertifications && "Certifications"
+    ].filter(Boolean)
+
     const structureSuggestions = [
-      `Detected ${presentSections.length} key sections: ${presentSections.join(" → ")}`,
-      presentSections.length >= 3 ? `Your section order is ATS-optimal. Recruiters scan: Summary (first 15 seconds) → Experience → Skills.` : `Consider adding missing sections: typically Resume should have Work Experience, Education, and Skills at minimum.`,
+      presentSections.length > 0
+        ? `Detected ${presentSections.length} key sections: ${presentSections.join(" → ")}`
+        : "No standard resume sections detected. Add clear headers like Experience, Education, and Skills.",
+      missingSections.length > 0
+        ? `Missing recommended sections: ${missingSections.join(", ")}.`
+        : "All core resume sections are present.",
       `Structure validation: ${analysisData.validationScore}% completeness. ${analysisData.validationScore >= 80 ? "Excellent parsing compatibility." : "Some sections may be missing or poorly labeled."}`,
       bulletPoints.length > 0
         ? `Average bullet description length: ${Math.round(avgBulletLength)} characters - ${avgBulletLength > 150 ? "descriptions are detailed and impactful" : "consider adding more detail to bullets"}.`
@@ -438,16 +449,22 @@ const generateAISuggestions = async (
     // 6. JOB MATCH SUGGESTIONS - Only if job description provided
     if (jobDescription && jobDescription.trim().length > 20) {
       const alignment = Math.round(analysisData.semanticScore * 100)
-      const matchQuality = alignment >= 75 ? "Excellent" : alignment >= 50 ? "Strong" : "Moderate"
-      const skillMatchCount = analysisData.skillCount
-      
+      const jobSkills = extractSkillsAdvanced(jobDescription)
+      const matchedSkills = analysisData.detectedSkills.filter((skill: string) =>
+        jobSkills.some(js => js.includes(skill) || skill.includes(js))
+      )
+      const missingSkills = jobSkills.filter(js => !matchedSkills.includes(js)).slice(0, 10)
+
       const jobSuggestions = [
-        `Job alignment analysis: ${alignment}% semantic match - ${matchQuality} fit between your experience and requirements.`,
-        `Your detected ${skillMatchCount} skills include relevant experience for this role.`,
-        `${alignment < 50 ? `Consider emphasizing: ${analysisData.detectedSkills.slice(0, 3).join(", ")} more prominently in your experience descriptions.` : `Your background aligns well; ensure achievements are quantified to maximize impact.`}`,
-        `Opportunity: Add 2-3 bullets that specifically address the role's key responsibilities to increase ATS match score.`
+        `Job alignment analysis: ${alignment}% semantic match between resume and job description.`,
+        matchedSkills.length > 0
+          ? `Matched job skills found in your resume: ${matchedSkills.slice(0, 6).join(", ")}.`
+          : "No clear skill matches detected between your resume and the job description.",
+        missingSkills.length > 0
+          ? `Missing job skills not found in your resume: ${missingSkills.slice(0, 6).join(", ")}.`
+          : "No missing job skills detected based on the description.",
       ]
-      
+
       suggestions.push({
         category: `Job Description Alignment (${alignment}% match)`,
         suggestions: jobSuggestions
@@ -612,26 +629,65 @@ const extractNamedEntities = async (text: string): Promise<{
 
 // Extract skills using regex and pattern matching
 const extractSkillsAdvanced = (text: string): string[] => {
-  const skillPatterns = {
-    programming: /(?:python|javascript|typescript|java|c\+\+|c#|php|ruby|go|rust|kotlin|swift|objc|scala|perl|r\s+language)/gi,
-    frontend: /(?:react|vue|angular|html|css|sass|bootstrap|tailwind|webpack|next\.?js|svelte|alpine|nuxt)/gi,
-    backend: /(?:node|express|django|flask|spring|rails|laravel|asp\.net|fastapi|gin|echo|fiber|quart)/gi,
-    database: /(?:sql|mongodb|postgresql|mysql|oracle|firebase|redis|cassandra|elasticsearch|dynamodb|cockroachdb|neo4j)/gi,
-    cloud: /(?:aws|azure|gcp|google\s+cloud|digitalocean|heroku|netlify|vercel|docker|kubernetes|openshift)/gi,
-    tools: /(?:git|jenkins|gitlab|github|jira|slack|trello|figma|confluence|asana|monday|postman|swagger)/gi,
-    ml: /(?:tensorflow|pytorch|scikit-learn|keras|nlp|machine\s+learning|deep\s+learning|ai|computer\s+vision|hugging\s+face)/gi,
-    devops: /(?:terraform|ansible|jenkins|circleci|travis|gitlab\s+ci|github\s+actions|docker|kubernetes|helm|prometheus)/gi,
+  const skillPhrases = {
+    programming: [
+      "python", "javascript", "typescript", "java", "c++", "c#", "php", "ruby", "go",
+      "rust", "kotlin", "swift", "objc", "scala", "perl", "r language"
+    ],
+    frontend: [
+      "react", "vue", "angular", "html", "css", "sass", "bootstrap", "tailwind",
+      "webpack", "next.js", "nextjs", "svelte", "alpine", "nuxt"
+    ],
+    backend: [
+      "node", "node.js", "express", "django", "flask", "spring", "rails", "laravel",
+      "asp.net", "fastapi", "gin", "echo", "fiber", "quart"
+    ],
+    database: [
+      "sql", "mongodb", "postgresql", "mysql", "oracle", "firebase", "redis",
+      "cassandra", "elasticsearch", "dynamodb", "cockroachdb", "neo4j"
+    ],
+    cloud: [
+      "aws", "azure", "gcp", "google cloud", "digitalocean", "heroku", "netlify",
+      "vercel", "docker", "kubernetes", "openshift"
+    ],
+    tools: [
+      "git", "jenkins", "gitlab", "github", "jira", "slack", "trello", "figma",
+      "confluence", "asana", "monday", "postman", "swagger"
+    ],
+    ml: [
+      "tensorflow", "pytorch", "scikit-learn", "keras", "nlp", "machine learning",
+      "deep learning", "ai", "computer vision", "hugging face"
+    ],
+    devops: [
+      "terraform", "ansible", "circleci", "travis", "gitlab ci", "github actions",
+      "helm", "prometheus"
+    ]
   }
 
-  const skills: string[] = []
-  Object.values(skillPatterns).forEach((pattern) => {
-    const matches = text.match(pattern)
-    if (matches) {
-      skills.push(...matches.map(m => m.toLowerCase()))
-    }
+  const normalizePhrase = (phrase: string) => phrase.toLowerCase().replace(/\s+/g, " ").trim()
+  const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const buildSkillRegex = (phrase: string) => {
+    const normalized = normalizePhrase(phrase)
+    const pattern = normalized
+      .split(" ")
+      .map(part => escapeRegex(part))
+      .join("\\s+")
+    return new RegExp(`(^|[^a-z0-9])${pattern}([^a-z0-9]|$)`, "i")
+  }
+
+  const normalizedText = text.toLowerCase()
+  const skills = new Set<string>()
+
+  Object.values(skillPhrases).forEach((phrases) => {
+    phrases.forEach((phrase) => {
+      const regex = buildSkillRegex(phrase)
+      if (regex.test(normalizedText)) {
+        skills.add(normalizePhrase(phrase))
+      }
+    })
   })
 
-  return [...new Set(skills)]
+  return Array.from(skills)
 }
 
 // Simple fallback extractor for organization names (company-like tokens)
@@ -887,10 +943,6 @@ export async function POST(request: NextRequest) {
     let experienceYears = 0;
     if (experienceMatch && experienceMatch[1]) {
       experienceYears = Math.min(50, parseFloat(experienceMatch[1]));
-    } else {
-      // Fallback: Count job positions and estimate 2-3 years per position
-      const jobMatches = resume.match(/(?:worked as|position of|role as|employed as|software engineer|developer|analyst)/gi) || [];
-      experienceYears = Math.min(50, Math.max(1, jobMatches.length * 2.5));
     }
     
     // Calculate leadership score more accurately (count keywords and cap at 100)
