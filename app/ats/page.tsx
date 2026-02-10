@@ -432,7 +432,6 @@ export default function ATSPage() {
               <div class="rl-label">Agent Reasoning</div>
               <div class="rl-text">${rl.reasoning}</div>
             </div>
-            <div class="rl-meta">Algorithm: ${rl.algorithm} • Candidate ID: ${rl.candidateId}</div>
           </div>
         ` : '<div class="muted">AI agent details unavailable.</div>'}
       </section>
@@ -459,17 +458,6 @@ export default function ATSPage() {
         <div class="metric"><div class="metric-label">Professional Tone</div><div class="metric-value">${aiAnalysis?.toneConfidence ?? 0}%</div><div class="metric-sub">${aiAnalysis?.isProfessional ? 'Professional' : 'Needs improvement'}</div></div>
       </section>
 
-      <section class="section plain">
-        <div class="section-title"><span class="icon">🤖</span><span>AI Model Architecture</span></div>
-        <div class="model-grid">
-          <div><span class="bold">Architecture:</span> ${aiAnalysis?.modelInfo?.architecture ?? '—'}</div>
-          <div><span class="bold">Training Data:</span> ${aiAnalysis?.modelInfo?.trainingData ?? '—'}</div>
-          <div><span class="bold">Generic AI:</span> ${aiAnalysis?.modelInfo?.isGenericAI ? 'Yes ✓' : 'No'}</div>
-        </div>
-        <div class="model-sub">
-          Semantic: ${aiAnalysis?.modelInfo?.semanticModel ?? '—'} • Quality: ${aiAnalysis?.modelInfo?.qualityModel ?? '—'} • NER: ${aiAnalysis?.modelInfo?.nerModel ?? '—'} • Tone: ${aiAnalysis?.modelInfo?.sentimentModel ?? '—'}
-        </div>
-      </section>
 
       <section class="two-col">
         <div class="col">
@@ -836,9 +824,6 @@ export default function ATSPage() {
                       <div className="text-white text-sm">{aiAnalysis.rlAgentDecision.reasoning}</div>
                     </div>
                     
-                    <div className="text-white/70 text-xs">
-                      Algorithm: {aiAnalysis.rlAgentDecision.algorithm} | Candidate ID: {aiAnalysis.rlAgentDecision.candidateId}
-                    </div>
                   </div>
                 )}
 
@@ -889,21 +874,6 @@ export default function ATSPage() {
                   </div>
                 </div>
 
-                {/* Models Information */}
-                <div className="mt-6 p-4 bg-white rounded-lg border border-blue-200">
-                  <h4 className="font-semibold text-blue-900 mb-3">🤖 AI Model Architecture</h4>
-                  <div className="text-sm text-blue-800 space-y-2">
-                    <p><strong>Architecture:</strong> {aiAnalysis.modelInfo?.architecture}</p>
-                    <p><strong>Training Data:</strong> {aiAnalysis.modelInfo?.trainingData}</p>
-                    <p><strong>Generic AI:</strong> {aiAnalysis.modelInfo?.isGenericAI ? "Yes ✓ - Works with any resume" : "No"}</p>
-                    <div className="mt-3 pt-3 border-t border-blue-100 text-xs text-blue-600">
-                      <p>Semantic: {aiAnalysis.modelInfo?.semanticModel}</p>
-                      <p>Quality: {aiAnalysis.modelInfo?.qualityModel}</p>
-                      <p>NER: {aiAnalysis.modelInfo?.nerModel}</p>
-                      <p>Tone: {aiAnalysis.modelInfo?.sentimentModel}</p>
-                    </div>
-                  </div>
-                </div>
 
                 {/* Detected Skills */}
                 {aiAnalysis.detectedSkills && aiAnalysis.detectedSkills.length > 0 && (

@@ -159,17 +159,20 @@ export class AIAgentEngine {
   /**
    * Pre-train on massive simulated hiring data to jumpstart learning
    * Trains on billions of resume patterns through synthetic data
-   * ENHANCED: 5x more training data with real-world diversity
+   * COMPREHENSIVE: Uses 1M samples covering all resume quality spectrum
    */
   private preTrainOnSimulatedData(): void {
-    // Simulate 250,000+ hiring decisions across diverse real-world patterns
-    // This represents training on equivalent of billions of resumes via diverse synthetic data
-    const simulatedDecisions = this.generateSimulatedHiringData(250000);
+    // Simulate 1,000,000+ diverse hiring decisions
+    // This represents training across the FULL quality spectrum from terrible (score 20) to excellent (score 95)
+    console.log('🚀 Training RL agent on 1 MILLION diverse resume patterns covering ALL quality types...');
+    const simulatedDecisions = this.generateSimulatedHiringData(1000000);
     
     // Train on simulated data in batches for efficiency
     let processedCount = 0;
-    for (let batch = 0; batch < simulatedDecisions.length; batch += 1000) {
-      const batchData = simulatedDecisions.slice(batch, batch + 1000);
+    const startTime = Date.now();
+    
+    for (let batch = 0; batch < simulatedDecisions.length; batch += 5000) {
+      const batchData = simulatedDecisions.slice(batch, batch + 5000);
       batchData.forEach(decision => {
         this.learnFromOutcome(
           decision.candidateId,
@@ -178,12 +181,19 @@ export class AIAgentEngine {
         );
         processedCount++;
       });
+      
+      // Log progress every 100k decisions
+      if (processedCount % 100000 === 0) {
+        const elapsed = (Date.now() - startTime) / 1000;
+        console.log(`✅ Trained on ${processedCount.toLocaleString()} diverse resume patterns (${Math.round((processedCount / simulatedDecisions.length) * 100)}%) in ${elapsed.toFixed(1)}s`);
+      }
     }
     
     // Decay learning rate slightly after pre-training
     this.learningRate *= 0.98;
-    console.log(`✅ Pre-training complete: ${simulatedDecisions.length} simulated hiring decisions from billions of resume patterns processed`);
-    console.log(`📊 Agent now trained on massive dataset equivalent to billions of resumes`);
+    const totalTime = (Date.now() - startTime) / 1000;
+    console.log(`🏆 RL Agent Pre-training COMPLETE: ${simulatedDecisions.length.toLocaleString()} diverse resumes trained in ${totalTime.toFixed(1)}s`);
+    console.log(`📊 Agent now understands full quality spectrum: Terrible→Poor→Average→Good→Excellent`);
   }
 
   /**
@@ -199,54 +209,45 @@ export class AIAgentEngine {
   }> {
     const data: Array<any> = [];
     
-    // ENHANCED: Define diverse resume distribution patterns (based on real industry data)
-    // Covers all experience levels, industries, and quality variations
+    // COMPREHENSIVE: Define 25+ distribution patterns covering FULL spectrum (20-95 scores)
+    // CRITICAL: Provides diversity in ALL dimensions so agent doesn't get locked into narrow range
     const distributions = [
-      // Freshers - Recent graduates (10% of candidates) - reduced weight
-      { tech: [35, 65], exp: [0, 1], edu: [7, 10], comm: [50, 75], lead: [15, 40], cult: [60, 85], weight: 0.10, label: 'Fresher' },
-      // Freshers - Exceptional (2% of candidates) - high potential, low experience
-      { tech: [70, 90], exp: [0, 1], edu: [8, 10], comm: [65, 85], lead: [30, 55], cult: [70, 90], weight: 0.02, label: 'Exceptional Fresher' },
-      // Junior - Entry level (13% of candidates)
-      { tech: [40, 70], exp: [1, 3], edu: [5, 8], comm: [45, 80], lead: [20, 55], cult: [55, 85], weight: 0.13, label: 'Junior' },
-      // Junior - High performer (4% of candidates)
-      { tech: [65, 85], exp: [1, 3], edu: [6, 9], comm: [60, 85], lead: [40, 65], cult: [65, 90], weight: 0.04, label: 'High Performer Junior' },
-      // Mid-level - Standard (16% of candidates)
-      { tech: [55, 80], exp: [3, 6], edu: [5, 8], comm: [55, 85], lead: [40, 70], cult: [60, 88], weight: 0.16, label: 'Mid-level' },
-      // Mid-level - Strong (10% of candidates)
-      { tech: [70, 90], exp: [3, 7], edu: [6, 9], comm: [65, 90], lead: [50, 80], cult: [65, 92], weight: 0.10, label: 'Strong Mid-level' },
-      // Senior - Standard (9% of candidates)
-      { tech: [70, 90], exp: [7, 12], edu: [5, 9], comm: [70, 92], lead: [60, 85], cult: [68, 92], weight: 0.09, label: 'Senior' },
-      // Senior - Leadership focused (5% of candidates)
-      { tech: [65, 85], exp: [8, 15], edu: [6, 10], comm: [75, 95], lead: [75, 95], cult: [75, 95], weight: 0.05, label: 'Senior Leader' },
-      // Principal/Staff - Technical experts (3% of candidates)
-      { tech: [85, 98], exp: [8, 20], edu: [7, 10], comm: [70, 90], lead: [55, 80], cult: [65, 90], weight: 0.03, label: 'Principal/Staff' },
-      // Specialists - Domain experts (3% of candidates)
+      // EXCELLENT TIER (scores 85-95)
+      { tech: [85, 98], exp: [8, 20], edu: [7, 10], comm: [70, 90], lead: [55, 80], cult: [65, 90], weight: 0.04, label: 'Principal/Staff' },
       { tech: [80, 95], exp: [5, 15], edu: [7, 10], comm: [60, 85], lead: [45, 75], cult: [60, 88], weight: 0.03, label: 'Specialist' },
-      // Career changers - Strong background (3% of candidates)
-      { tech: [40, 70], exp: [0, 3], edu: [6, 10], comm: [60, 85], lead: [35, 65], cult: [55, 85], weight: 0.03, label: 'Career Changer' },
-      // Career changers - Weak fit (2% of candidates)
-      { tech: [25, 55], exp: [0, 4], edu: [5, 8], comm: [45, 75], lead: [25, 55], cult: [45, 75], weight: 0.02, label: 'Weak Career Changer' },
-      // Overqualified but gaps (2% of candidates)
-      { tech: [50, 75], exp: [8, 18], edu: [5, 8], comm: [55, 80], lead: [50, 75], cult: [50, 80], weight: 0.02, label: 'Overqualified with Gaps' },
-      // Technical genius, poor communication (2% of candidates)
-      { tech: [85, 98], exp: [3, 10], edu: [7, 10], comm: [30, 55], lead: [20, 50], cult: [40, 70], weight: 0.02, label: 'Tech Genius Low Comm' },
-      // Great culture fit, mediocre skills (2% of candidates)
-      { tech: [40, 65], exp: [2, 8], edu: [5, 8], comm: [75, 92], lead: [65, 88], cult: [80, 95], weight: 0.02, label: 'Culture Champion' },
+      { tech: [70, 90], exp: [7, 12], edu: [5, 9], comm: [70, 92], lead: [60, 85], cult: [68, 92], weight: 0.06, label: 'Senior Strong' },
+      { tech: [65, 85], exp: [8, 15], edu: [6, 10], comm: [75, 95], lead: [75, 95], cult: [75, 95], weight: 0.04, label: 'Senior Leader' },
       
-      // ===== TRULY BAD RESUMES (9% of candidates) - NEW =====
-      // Unqualified with poor communication (3% of candidates)
+      // GOOD TIER (scores 70-85)
+      { tech: [70, 90], exp: [3, 7], edu: [6, 9], comm: [65, 90], lead: [50, 80], cult: [65, 92], weight: 0.08, label: 'Strong Mid-level' },
+      { tech: [55, 80], exp: [3, 6], edu: [5, 8], comm: [55, 85], lead: [40, 70], cult: [60, 88], weight: 0.12, label: 'Mid-level Standard' },
+      { tech: [65, 85], exp: [1, 3], edu: [6, 9], comm: [60, 85], lead: [40, 65], cult: [65, 90], weight: 0.05, label: 'High Performer Junior' },
+      { tech: [70, 90], exp: [0, 1], edu: [8, 10], comm: [65, 85], lead: [30, 55], cult: [70, 90], weight: 0.02, label: 'Exceptional Fresher' },
+      
+      // AVERAGE TIER (scores 50-70)
+      { tech: [40, 70], exp: [1, 3], edu: [5, 8], comm: [45, 80], lead: [20, 55], cult: [55, 85], weight: 0.10, label: 'Junior Standard' },
+      { tech: [35, 65], exp: [0, 1], edu: [7, 10], comm: [50, 75], lead: [15, 40], cult: [60, 85], weight: 0.08, label: 'Fresher Standard' },
+      { tech: [40, 70], exp: [0, 3], edu: [6, 10], comm: [60, 85], lead: [35, 65], cult: [55, 85], weight: 0.03, label: 'Career Changer Strong' },
+      { tech: [50, 75], exp: [8, 18], edu: [5, 8], comm: [55, 80], lead: [50, 75], cult: [50, 80], weight: 0.02, label: 'Overqualified Gaps' },
+      { tech: [60, 80], exp: [2, 6], edu: [5, 8], comm: [50, 75], lead: [35, 60], cult: [50, 80], weight: 0.05, label: 'Mid-level Average' },
+      
+      // POOR TIER (scores 30-50)
+      { tech: [25, 55], exp: [0, 4], edu: [5, 8], comm: [45, 75], lead: [25, 55], cult: [45, 75], weight: 0.04, label: 'Weak Career Changer' },
+      { tech: [85, 98], exp: [3, 10], edu: [7, 10], comm: [30, 55], lead: [20, 50], cult: [40, 70], weight: 0.02, label: 'Tech Genius Low Comm' },
+      { tech: [40, 65], exp: [2, 8], edu: [5, 8], comm: [75, 92], lead: [65, 88], cult: [80, 95], weight: 0.02, label: 'Culture Champion' },
+      { tech: [35, 60], exp: [1, 4], edu: [4, 7], comm: [40, 65], lead: [25, 50], cult: [45, 70], weight: 0.03, label: 'Junior Weak' },
+      { tech: [20, 50], exp: [2, 8], edu: [4, 7], comm: [35, 60], lead: [20, 45], cult: [40, 65], weight: 0.02, label: 'Irrelevant Experience' },
+      { tech: [30, 55], exp: [0, 2], edu: [4, 7], comm: [30, 55], lead: [20, 40], cult: [35, 60], weight: 0.03, label: 'Fresher Weak' },
+      
+      // TERRIBLE TIER (scores 20-35)
       { tech: [10, 35], exp: [0, 2], edu: [3, 6], comm: [20, 45], lead: [10, 30], cult: [30, 55], weight: 0.03, label: 'Unqualified Poor Comm' },
-      // Minimal effort / Very short resume (2% of candidates)
       { tech: [15, 40], exp: [0, 3], edu: [4, 7], comm: [25, 50], lead: [15, 35], cult: [35, 60], weight: 0.02, label: 'Minimal Effort' },
-      // Completely irrelevant experience (2% of candidates)
-      { tech: [20, 45], exp: [2, 8], edu: [4, 7], comm: [35, 60], lead: [20, 45], cult: [40, 65], weight: 0.02, label: 'Irrelevant Experience' },
-      // No skills listed / Generic resume (1% of candidates)
-      { tech: [12, 30], exp: [0, 4], edu: [3, 6], comm: [30, 55], lead: [12, 35], cult: [32, 58], weight: 0.01, label: 'No Skills Listed' },
-      // Poor formatting / Typos (0.5% of candidates)
-      { tech: [18, 42], exp: [1, 5], edu: [4, 7], comm: [22, 48], lead: [15, 38], cult: [28, 52], weight: 0.005, label: 'Poor Formatting' },
-      // Extremely underqualified (0.5% of candidates)
-      { tech: [8, 25], exp: [0, 1], edu: [2, 5], comm: [18, 40], lead: [8, 25], cult: [25, 50], weight: 0.005, label: 'Extremely Underqualified' }
+      { tech: [12, 30], exp: [0, 4], edu: [3, 6], comm: [30, 55], lead: [12, 35], cult: [32, 58], weight: 0.01, label: 'No Skills' },
+      { tech: [18, 42], exp: [1, 5], edu: [4, 7], comm: [22, 48], lead: [15, 38], cult: [28, 52], weight: 0.01, label: 'Poor Formatting' },
+      { tech: [8, 25], exp: [0, 1], edu: [2, 5], comm: [18, 40], lead: [8, 25], cult: [25, 50], weight: 0.01, label: 'Extremely Underqualified' },
+      { tech: [5, 20], exp: [0, 1], edu: [2, 4], comm: [15, 35], lead: [5, 20], cult: [20, 40], weight: 0.005, label: 'Complete Mismatch' }
     ];
+
     
     for (let i = 0; i < count; i++) {
       // Select random distribution based on weights
