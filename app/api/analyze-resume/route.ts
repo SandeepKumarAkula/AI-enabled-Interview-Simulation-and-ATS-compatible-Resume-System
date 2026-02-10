@@ -1395,16 +1395,16 @@ export async function POST(request: NextRequest) {
     else if (juniorKeywords > 1 || experienceYears < 2) roleLevel = 'junior'
     else roleLevel = 'mid'
 
-    // LENGTH normalization - Now allows excellent resumes to reach 90+
+    // LENGTH normalization - BALANCED (more discriminating)
     const wordCount = resume.split(/\s+/).length
     let lengthScore = 100
-    if (wordCount < 150) lengthScore = 50   // Short resume
-    else if (wordCount < 250) lengthScore = 70   // Below ideal
-    else if (wordCount < 400) lengthScore = 95   // INCREASED from 82 - good length
-    else if (wordCount < 800) lengthScore = 100  // Ideal range
-    else if (wordCount < 1200) lengthScore = 96  // Slightly long
-    else if (wordCount < 1800) lengthScore = 90  // Long
-    else lengthScore = 80  // Very long
+    if (wordCount < 150) lengthScore = 45  // Lowered for very short resumes
+    else if (wordCount < 250) lengthScore = 60  // Lowered
+    else if (wordCount < 400) lengthScore = 82  // Lowered
+    else if (wordCount < 800) lengthScore = 100 // Ideal range (unchanged)
+    else if (wordCount < 1200) lengthScore = 96 // Slightly lowered
+    else if (wordCount < 1800) lengthScore = 88 // Lowered
+    else lengthScore = 72  // Lowered for very long resumes
 
     // Component scores with BALANCED BASELINES (more discriminating)
     const parsingScore = Math.max(40, Math.min(100, validationScore || 40))  // Floor lowered to 40
@@ -1481,7 +1481,7 @@ export async function POST(request: NextRequest) {
 
     // Use industry-standard score as the final overall ATS score
     // Apply minimal baseline boost (reduced to better differentiate bad resumes)
-    const industryBaseline = 8  // Increased from 2 to allow excellent resumes to reach 90+ range
+    const industryBaseline = 2  // Reduced from 8 to allow scores below 50 for truly bad resumes
     overallAtsScore = Math.max(25, Math.min(100, industryScore + industryBaseline))
 
     const evidenceInsights = buildEvidenceInsights(resume, detectedSkills, {
@@ -1530,46 +1530,103 @@ export async function POST(request: NextRequest) {
       improvementSuggestions = []
     }
 
-    // SANITIZE RESPONSE - Remove internal/technical fields from user output
-    const sanitizedAnalysis = {
-      // Core hiring decision (only what matters)
-      overallScore: overallAtsScore,
-      decision: rlDecision.decision,
-      confidence: (rlDecision.confidenceScore * 100).toFixed(1) + '%',
-      reasoning: rlDecision.reasoning,
-      
-      // Scoring breakdown (user-friendly only)
-      scoreBreakdown: {
-        parsing: parsingScore,
-        content: contentScore,
-        relevance: relevanceScore,
-        skills: skillsScore,
-        experience: experienceScore,
-        impact: impactScore,
-        clarity: clarityScore,
-        length: lengthScore,
-      },
-      
-      // Resume analysis (actionable feedback)
-      strengths: evidenceInsights.strengths,
-      weaknesses: evidenceInsights.weaknesses,
-      matchedSkills: matchedSkills.slice(0, 10),
-      missingSkills: jobSkills.filter(js => !matchedSkills.includes(js)).slice(0, 10),
-      
-      // Improvements (what to fix)
-      improvementSuggestions: improvementSuggestions,
-      
-      // NO technical details exposed:
-      // ✗ Algorithm, Architecture, Model info
-      // ✗ Candidate ID, Training data
-      // ✗ Raw NER, Semantic scores, Tone analysis
-      // ✗ Generic AI flags, Quality metrics
-      // ✗ Internal ensemble breakdown
-    }
-
     return NextResponse.json({
       success: true,
-      analysis: sanitizedAnalysis,
+      analysis: {
+        // ========================================
+        // CUSTOM ATS AGENT SCORE (Your own model)
+        // ========================================
+        customAgentScore: customAgentAnalysis.score,
+        customAgentReasoning: customAgentAnalysis.reasoning,
+        customAgentConfidence: Math.round(customAgentAnalysis.confidence * 100),
+        customAgentFactors: customAgentAnalysis.factors,
+
+        // Resume validation (NEW - STRICT)
+        validationScore: validationScore,
+        resumeComponentsValid: resumeValidation.isValidResume,
+        resumeComponentScores: resumeValidation.scores,
+        
+        // Pre-trained transformer metrics
+        resumeQuality: resumeQuality.quality,
+        professionalScore: resumeQuality.professionalScore,
+        resumeTone: resumeTone.sentiment,
+        isProfessional: resumeTone.isProfessional,
+        toneConfidence: Math.round(resumeTone.score * 100),
+
+        // Semantic matching using transformer embeddings
+        semanticScore: Math.round(Math.min(semanticScore * 100, 100)), // Cap at 100
+        semanticAlignment:
+          semanticScore > 0.7 ? "Excellent" : semanticScore > 0.5 ? "Good" : "Moderate",
+
+        // Job matching
+        jobAnalysis: {
+          semanticAlignment: Math.round(semanticScore * 100),
+          skillMatchPercentage: skillMatchPercentage,
+          matchedSkills: matchedSkills.slice(0, 10),
+          missingSkills: jobSkills.filter(js => !matchedSkills.includes(js)).slice(0, 10),
+        },
+
+        // NER-based entity extraction
+        entities: entities,
+
+        // Detected skills
+        detectedSkills: detectedSkills,
+        skillCount: detectedSkills.length,
+
+        // Specific issues found for personalized recommendations
+        specificIssues: {
+          specialCharactersFound: specificIssues.specialCharacters,
+          passiveVerbExamples: specificIssues.passiveVerbExamples,
+          linesLackingMetrics: specificIssues.linesWithoutMetrics,
+          casualWordsUsed: specificIssues.casualWords,
+        },
+
+        // AI-GENERATED IMPROVEMENT SUGGESTIONS (from AI models, awaited above)
+        improvementSuggestions: improvementSuggestions,
+
+        // Evidence-based insights derived only from resume text
+        evidenceStrengths: evidenceInsights.strengths,
+        evidenceWeaknesses: evidenceInsights.weaknesses,
+
+        // OVERALL ATS SCORE (based on ensemble of agents + validation)
+        overallScore: overallAtsScore,
+        ensembleBreakdown: {
+          median: ensemble.median,
+          mean: ensemble.mean,
+          calibrated: ensemble.calibrated,
+          final: ensemble.final,
+          agentsUsed: agentScores.length,
+          intelligentAgentIncluded: ENABLE_INTELLIGENT ? true : false
+        },
+        industryScoreBreakdown: {
+          parsing: parsingScore,
+          content: contentScore,
+          relevance: relevanceScore,
+          skills: skillsScore,
+          experience: experienceScore,
+          experienceYears: experienceYears,
+          impact: impactScore,
+          clarity: clarityScore,
+          length: lengthScore,
+          wordCount: wordCount,
+          metricsCoverage: metricCoverage,
+          roleLevel: roleLevel,
+          final: overallAtsScore
+        },
+        
+        // 🤖 AI HIRING DECISION
+        rlAgentDecision: {
+          decision: rlDecision.decision,
+          confidence: (rlDecision.confidenceScore * 100).toFixed(1) + '%',
+          reasoning: rlDecision.reasoning,
+        },
+        // Intelligent Neural Agent decision (if enabled)
+        intelligentAgentDecision: intelligentDecision ? {
+          decision: intelligentDecision.decision,
+          confidence: intelligentDecision.confidence,
+          reasoning: intelligentDecision.reasoning,
+        } : null,
+      },
       agentErrors,
     })
   } catch (error) {
