@@ -2,12 +2,34 @@
 import { NextRequest, NextResponse } from "next/server"
 import { HfInference } from "@huggingface/inference"
 import { validateResumeStructure, getResumeValidationScore } from "@/lib/resume-validator"
-import { customATSAgent } from "@/lib/custom-ats-agent"
-import { rlATSAgent, type ResumFeatures } from "@/lib/rl-ats-agent"
-import { intelligentATSAgent } from "@/lib/intelligent-ats-agent"
+import { CustomATSAgent } from "@/lib/custom-ats-agent-complete"
+import { AIAgentEngine } from "@/lib/rl-ats-agent-complete"
+import { IntelligentATSAgent } from "@/lib/intelligent-ats-agent-complete"
+import { getCustomAgentConfig, getRLAgentConfig, getIntelligentAgentConfig } from "@/lib/ats-agent-config"
 import { ensembleScore, normalizeToPercent, calibrateLogistic, getLeniencyMultiplier } from "@/lib/ats-scoring-utils"
 import { getUserFromToken } from "@/lib/auth"
 import nlp from 'compromise'
+
+// Initialize production-ready AI agents
+let customAgent: CustomATSAgent | null = null
+let rlAgent: AIAgentEngine | null = null
+let intelligentAgent: IntelligentATSAgent | null = null
+
+const getAgents = () => {
+  if (!customAgent) customAgent = new CustomATSAgent(getCustomAgentConfig())
+  if (!rlAgent) rlAgent = new AIAgentEngine(getRLAgentConfig())
+  if (!intelligentAgent) intelligentAgent = new IntelligentATSAgent(getIntelligentAgentConfig())
+  return { customAgent, rlAgent, intelligentAgent }
+}
+
+interface ResumFeatures {
+  technicalScore: number
+  experienceYears: number
+  educationLevel: number
+  communicationScore: number
+  leadershipScore: number
+  cultureFitScore: number
+}
 
 // Initialize Hugging Face client with free API
 const hf = new HfInference(process.env.HUGGINGFACE_API_TOKEN || "")
@@ -892,11 +914,12 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      rlDecision = rlATSAgent.makeDecision(rlFeatures, jobDescription);
+      const { rlAgent: rlAgentInstance } = getAgents()
+      rlDecision = rlAgentInstance.makeDecision(rlFeatures, jobDescription);
       try {
-        rlATSAgent.saveToLocalStorage();
+        // RL agent state is saved in memory automatically
       } catch (e) {
-        console.warn('RL agent saveToLocalStorage failed:', e)
+        console.warn('RL agent state save failed:', e)
       }
     } catch (e) {
       console.error('RL agent decision failed:', e)
@@ -904,7 +927,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate ATS score based on RL agent Q-value and features (0-100)
-    const rlScoreRaw = (rlDecision?.qValue || 0.5) * 100
+    const rlScoreRaw = (rlDecision?.confidence || 0.5) * 100
     const rlScore = normalizeToPercent(rlScoreRaw, 0, 100)
 
     // Optionally call Intelligent ATS Neural agent (opt-in via env)
@@ -918,14 +941,14 @@ export async function POST(request: NextRequest) {
           technicalScore: Math.min(100, rlFeatures.technicalScore || 0),
           communicationScore: Math.min(100, rlFeatures.communicationScore || 0),
           leadershipScore: Math.min(100, rlFeatures.leadershipScore || 0),
-          innovationScore: Math.min(100, Math.max(0, detectedSkills.length > 8 ? 80 : detectedSkills.length * 6)),
-          cultureAlignmentScore: Math.min(100, Math.round(semanticScore * 100)),
-          jobFitScore: Math.min(100, skillMatchPercentage || 0),
-          rawScore: resumeQuality.professionalScore || 50,
+          educationLevel: Math.min(10, rlFeatures.educationLevel || 3),
+          experienceYears: Math.min(50, rlFeatures.experienceYears || 0),
+          cultureFitScore: Math.min(100, Math.round(semanticScore * 100)),
         }
 
-        intelligentDecision = await intelligentATSAgent.makeDecision(mlFeatures as any, resume, jobDescription)
-        intelligentScore = intelligentDecision?.score || null
+        const { intelligentAgent: intelligentAgentInstance } = getAgents()
+        intelligentDecision = intelligentAgentInstance.makeDecision(mlFeatures as any, jobDescription)
+        intelligentScore = intelligentDecision?.confidence ? intelligentDecision.confidence * 100 : null
       } catch (e) {
         console.error('Intelligent ATS agent failed:', e)
         agentErrors.push('intelligentAgent:' + String(e))
@@ -936,10 +959,9 @@ export async function POST(request: NextRequest) {
     // CUSTOM ATS AGENT ANALYSIS - Your proprietary AI intelligence (guarded)
     let customAgentAnalysis: any = { score: 50, reasoning: 'fallback', confidence: 0.5, factors: [] }
     try {
-      customAgentAnalysis = await customATSAgent.analyzeResume({
-        resumeText: resume,
-        jobDescription: jobDescription,
-      })
+      const { customAgent: customAgentInstance } = getAgents()
+      customAgentAnalysis = customAgentInstance.analyzeResume(jobDescription || '', rlFeatures)
+      customAgentAnalysis.score = customAgentAnalysis.confidence ? customAgentAnalysis.confidence * 100 : 50
     } catch (e) {
       console.error('Custom ATS agent failed:', e)
       agentErrors.push('customAgent:' + String(e))
