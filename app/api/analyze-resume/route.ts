@@ -1147,8 +1147,39 @@ export async function POST(request: NextRequest) {
       agentErrors.push('rlAgent:' + String(e))
     }
 
-    // Calculate ATS score based on RL agent Q-value and features (0-100)
-    const rlScoreRaw = (rlDecision?.confidence || 0.5) * 100
+    // HARD OVERRIDE: Deterministic decision based on features only
+    // This replaces any RL randomness and ensures consistent outcomes.
+    const atsScoreFromFeatures = Math.round(
+      (rlFeatures.technicalScore * 0.28 +
+        Math.min(rlFeatures.experienceYears / 8, 1) * 20 +
+        (rlFeatures.communicationScore / 100) * 18 +
+        (rlFeatures.cultureFitScore / 100) * 15 +
+        (rlFeatures.educationLevel / 10) * 12 +
+        (rlFeatures.leadershipScore / 100) * 7) / 1.2
+    )
+
+    let deterministicDecision: 'HIRE' | 'CONSIDER' | 'REJECT' = 'REJECT'
+    if (atsScoreFromFeatures >= 80) deterministicDecision = 'HIRE'
+    else if (atsScoreFromFeatures >= 65) deterministicDecision = 'CONSIDER'
+
+    const reasoningParts = [] as string[]
+    if (rlFeatures.technicalScore >= 70) reasoningParts.push('Strong technical skills')
+    if (rlFeatures.communicationScore >= 70) reasoningParts.push('Excellent communication')
+    if (rlFeatures.leadershipScore >= 65) reasoningParts.push('Leadership potential')
+    if (rlFeatures.experienceYears >= 3) reasoningParts.push('Relevant experience')
+    if (reasoningParts.length === 0) reasoningParts.push('Limited signal strength from resume features')
+
+    rlDecision = {
+      decision: deterministicDecision,
+      confidenceScore: Math.max(0.3, Math.min(1.0, atsScoreFromFeatures / 100)),
+      qValue: Math.max(0.3, Math.min(1.0, atsScoreFromFeatures / 100)),
+      predictedSuccessRate: Math.max(0.3, Math.min(1.0, atsScoreFromFeatures / 100)),
+      reasoning: reasoningParts.join(', '),
+      candidateId: rlDecision?.candidateId || 'unknown',
+    }
+
+    // Calculate ATS score based on deterministic decision score (0-100)
+    const rlScoreRaw = (rlDecision?.confidenceScore || 0.5) * 100
     const rlScore = normalizeToPercent(rlScoreRaw, 0, 100)
 
     // Optionally call Intelligent ATS Neural agent (opt-in via env)
@@ -1334,7 +1365,7 @@ export async function POST(request: NextRequest) {
           reasoning: rlDecision.reasoning,
           candidateId: rlDecision.candidateId,
           features: rlFeatures,
-          algorithm: "Q-Learning Reinforcement Learning",
+          algorithm: "Deterministic ATS Scoring (Override)",
           isRealAI: true
         },
         // Intelligent Neural Agent decision (if enabled)
