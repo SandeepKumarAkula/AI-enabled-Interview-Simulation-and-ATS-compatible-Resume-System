@@ -39,6 +39,81 @@ const DEFAULT_LLM_TEMPERATURE = parseFloat(process.env.AI_MODEL_TEMPERATURE || '
 // NER mode: 'auto' | 'fallback' — set NER_MODE=fallback to force regex fallback
 const NER_MODE = process.env.NER_MODE || 'auto'
 
+const BULLET_PATTERN = /^\s*(?:[-•*►▪·]|\d+[.)])\s+/
+
+const normalizeLine = (line: string) => line.replace(/\s+/g, " ").trim()
+
+const getResumeLines = (text: string) =>
+  text
+    .split(/\r?\n/)
+    .map(normalizeLine)
+    .filter(line => line.length > 0)
+
+const shortenEvidence = (line: string, maxLen = 140) =>
+  line.length > maxLen ? `${line.slice(0, maxLen)}...` : line
+
+const formatEvidence = (lines: string[]) =>
+  lines.map(line => `"${shortenEvidence(line)}"`).join(" | ")
+
+const findMatchingLines = (lines: string[], regex: RegExp, max = 3) =>
+  lines.filter(line => regex.test(line)).slice(0, max)
+
+const buildSkillRegex = (skill: string) => {
+  const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i")
+}
+
+const findSkillEvidence = (lines: string[], skill: string, max = 2) =>
+  findMatchingLines(lines, buildSkillRegex(skill), max)
+
+const ACTION_VERB_PATTERN = /\b(achieved|built|created|designed|developed|implemented|improved|led|managed|optimized|engineered|launched|delivered|owned|spearheaded|mentored|automated|streamlined|reduced|increased)\b/i
+
+const METRIC_PATTERN = /(\d+%|\$[\d,]+|[\d,]+\s*(users|customers|clients|projects|team members|people))/i
+
+const buildEvidenceInsights = (
+  resumeText: string,
+  detectedSkills: string[],
+  issues: { passiveVerbExamples: string[]; linesWithoutMetrics: string[]; casualWords: string[] }
+) => {
+  const lines = getResumeLines(resumeText)
+  const bulletLines = lines.filter(line => BULLET_PATTERN.test(line))
+  const metricLines = bulletLines.filter(line => METRIC_PATTERN.test(line))
+  const actionVerbLines = bulletLines.filter(line => ACTION_VERB_PATTERN.test(line))
+  const topSkills = detectedSkills.slice(0, 5)
+  const skillEvidence = topSkills.map(skill => findSkillEvidence(lines, skill)).flat().slice(0, 3)
+
+  const strengths: string[] = []
+  if (bulletLines.length > 0) {
+    strengths.push(`Uses bullet points for experience. Evidence: ${formatEvidence(bulletLines.slice(0, 2))}`)
+  }
+  if (metricLines.length > 0) {
+    strengths.push(`Includes quantifiable metrics. Evidence: ${formatEvidence(metricLines.slice(0, 2))}`)
+  }
+  if (actionVerbLines.length > 0) {
+    strengths.push(`Uses action verbs in bullets. Evidence: ${formatEvidence(actionVerbLines.slice(0, 2))}`)
+  }
+  if (topSkills.length > 0) {
+    strengths.push(`Lists technical skills such as ${topSkills.join(", ")}. Evidence: ${formatEvidence(skillEvidence) || "No explicit skill lines found."}`)
+  }
+
+  const weaknesses: string[] = []
+  if (issues.linesWithoutMetrics.length > 0) {
+    weaknesses.push(`Some bullets lack metrics. Evidence: ${formatEvidence(issues.linesWithoutMetrics)}`)
+  }
+  if (issues.passiveVerbExamples.length > 0) {
+    weaknesses.push(`Passive voice detected. Evidence: ${formatEvidence(issues.passiveVerbExamples)}`)
+  }
+  if (issues.casualWords.length > 0) {
+    const casualRegex = new RegExp(`\\b(${issues.casualWords.join("|")})\\b`, "i")
+    const casualLines = findMatchingLines(lines, casualRegex, 2)
+    if (casualLines.length > 0) {
+      weaknesses.push(`Casual language detected. Evidence: ${formatEvidence(casualLines)}`)
+    }
+  }
+
+  return { strengths, weaknesses }
+}
+
 // Simple in-memory circuit breaker for HF provider errors (protects against degraded performance)
 let hfErrorCount = 0
 let hfErrorWindowStart = 0
@@ -315,8 +390,8 @@ const generateAISuggestions = async (
     const suggestions: Array<{ category: string; suggestions: string[] }> = []
 
     // ANALYZE ACTUAL RESUME CONTENT - Extract real patterns, not templates
-    const lines = resumeText.split("\n").filter(l => l.trim().length > 0)
-    const bulletPoints = lines.filter(l => l.match(/^[\s]*[-•*►▪]/))
+    const lines = getResumeLines(resumeText)
+    const bulletPoints = lines.filter(l => BULLET_PATTERN.test(l))
     const avgBulletLength = bulletPoints.length > 0 
       ? bulletPoints.reduce((sum, b) => sum + b.length, 0) / bulletPoints.length 
       : 0
@@ -325,10 +400,15 @@ const generateAISuggestions = async (
     if (analysisData.skillCount > 0) {
       const topSkills = analysisData.detectedSkills.slice(0, 5)
 
+      const skillEvidence = topSkills
+        .map((skill: string) => findSkillEvidence(lines, skill))
+        .flat()
+        .slice(0, 3)
+
       const skillSuggestions = [
-        `Your top 5 detected skills are: ${topSkills.join(", ")}. These should be prominently featured in your summary or skills section.`,
-        `With ${analysisData.skillCount} total skills detected, consider grouping them by category: Programming Languages, Frameworks, Tools, Methodologies.`,
-        `${analysisData.detectedSkills.slice(5, 10).length > 0 ? `Secondary skills include: ${analysisData.detectedSkills.slice(5, 10).join(", ")} - ensure these appear in your experience bullets.` : "Focus on depth in your strongest areas rather than listing superficial skills."}`
+        `Top detected skills: ${topSkills.join(", ")}. Evidence: ${formatEvidence(skillEvidence) || "No explicit skill lines found."}`,
+        `Total skills detected: ${analysisData.skillCount}. Consider grouping them by category (Languages, Frameworks, Tools).`,
+        `${analysisData.detectedSkills.slice(5, 10).length > 0 ? `Secondary skills found: ${analysisData.detectedSkills.slice(5, 10).join(", ")}.` : "Focus on depth in your strongest areas rather than listing superficial skills."}`
       ]
       
       suggestions.push({
@@ -347,7 +427,7 @@ const generateAISuggestions = async (
       if (examplePassive) {
         toneSuggestions.push(`Passive voice detected: "${examplePassive}" - Replace with stronger action: "${actionVerb} the process by..."`)
       }
-      toneSuggestions.push(`Tone confidence at ${analysisData.toneConfidence}% - target professional tone uses strong action verbs consistently.`)
+      toneSuggestions.push(`Tone confidence at ${analysisData.toneConfidence}%. Evidence: ${examplePassive ? `"${examplePassive}"` : "No passive lines sampled."}`)
       if (casualWordsStr) {
         toneSuggestions.push(`Casual language found: "${casualWordsStr}" - Use industry-standard terminology instead.`)
       }
@@ -364,7 +444,7 @@ const generateAISuggestions = async (
       const exampleBullet = analysisData.metricsIssues[0]?.substring(0, 85) || "achievement bullet"
       
       const metricsSuggestions = [
-        `Found ${metricsGap} achievement bullets without quantifiable metrics: "${exampleBullet}..."`,
+        `Found ${metricsGap} achievement bullets without quantifiable metrics. Evidence: "${exampleBullet}..."`,
         `Each bullet needs one of: percentage improvement (15% increase), financial impact ($50K saved), team size (led 8 engineers), or scope (reached 500K users).`,
         `Reframe: "${exampleBullet}" → "Optimized ${exampleBullet.substring(0,30).toLowerCase()} resulting in [X% improvement / $X saved / X team / X users]"`,
         `Metric-driven bullets are 3x more likely to trigger recruiter callbacks compared to generic descriptions.`
@@ -393,7 +473,7 @@ const generateAISuggestions = async (
         suggestions: formatSuggestions
       })
     } else {
-      const hasBullets = bulletPoints.length > 0
+      const hasBullets = bulletPoints.length > 0 || /[•▪►·]/.test(resumeText)
       suggestions.push({
         category: "Formatting Status",
         suggestions: [
@@ -436,7 +516,7 @@ const generateAISuggestions = async (
         ? `Missing recommended sections: ${missingSections.join(", ")}.`
         : "All core resume sections are present.",
       `Structure validation: ${analysisData.validationScore}% completeness. ${analysisData.validationScore >= 80 ? "Excellent parsing compatibility." : "Some sections may be missing or poorly labeled."}`,
-      bulletPoints.length > 0
+      bulletPoints.length > 0 || /[•▪►·]/.test(resumeText)
         ? `Average bullet description length: ${Math.round(avgBulletLength)} characters - ${avgBulletLength > 150 ? "descriptions are detailed and impactful" : "consider adding more detail to bullets"}.`
         : "No bullet points detected - add concise bullet statements under each role or project."
     ]
@@ -455,10 +535,15 @@ const generateAISuggestions = async (
       )
       const missingSkills = jobSkills.filter(js => !matchedSkills.includes(js)).slice(0, 10)
 
+      const matchedEvidence = matchedSkills
+        .map((skill: string) => findSkillEvidence(lines, skill))
+        .flat()
+        .slice(0, 3)
+
       const jobSuggestions = [
         `Job alignment analysis: ${alignment}% semantic match between resume and job description.`,
         matchedSkills.length > 0
-          ? `Matched job skills found in your resume: ${matchedSkills.slice(0, 6).join(", ")}.`
+          ? `Matched job skills found in your resume: ${matchedSkills.slice(0, 6).join(", ")}. Evidence: ${formatEvidence(matchedEvidence) || "No explicit lines found."}`
           : "No clear skill matches detected between your resume and the job description.",
         missingSkills.length > 0
           ? `Missing job skills not found in your resume: ${missingSkills.slice(0, 6).join(", ")}.`
@@ -791,7 +876,6 @@ const analyzeSpecificIssues = (text: string): {
   const specialCharSymbols = ['◆', '■', '★', '↑', '→', '←', '↓', '♦', '✓', '✗', '●', '○']
   const passiveVoicePattern = /\b(is|are|was|were|be|been|being)\b\s+\w+(ed|en)\b/i
   const casualLanguage = ['like', 'cool', 'awesome', 'basically', 'really', 'very', 'pretty', 'quite']
-  const metricPattern = /(\d+%|\$[\d,]+|[\d,]+\s*(users|customers|clients|projects|team members|people))/i
 
   const isContactLine = (line: string): boolean => {
     const emailPattern = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/
@@ -810,7 +894,7 @@ const analyzeSpecificIssues = (text: string): {
   })
 
   // Find lines with passive voice
-  const lines = text.split('\n')
+  const lines = getResumeLines(text)
   const passiveLines = lines
     .filter(line => line.length > 20 && passiveVoicePattern.test(line) && !isContactLine(line))
     .slice(0, 3)
@@ -818,8 +902,8 @@ const analyzeSpecificIssues = (text: string): {
   // Find lines without metrics
   const linesWithoutMetrics = lines
     .filter((line) => {
-      const hasBullet = line.trim().startsWith('-') || line.trim().startsWith('•')
-      const hasMetric = metricPattern.test(line)
+      const hasBullet = BULLET_PATTERN.test(line)
+      const hasMetric = METRIC_PATTERN.test(line)
       return hasBullet && !hasMetric && line.length > 20
     })
     .slice(0, 3)
@@ -1091,7 +1175,11 @@ export async function POST(request: NextRequest) {
       improvementSuggestions = []
     }
 
-
+    const evidenceInsights = buildEvidenceInsights(resume, detectedSkills, {
+      passiveVerbExamples: specificIssues.passiveVerbExamples,
+      linesWithoutMetrics: specificIssues.linesWithoutMetrics,
+      casualWords: specificIssues.casualWords,
+    })
 
     return NextResponse.json({
       success: true,
@@ -1146,6 +1234,10 @@ export async function POST(request: NextRequest) {
 
         // AI-GENERATED IMPROVEMENT SUGGESTIONS (from AI models, awaited above)
         improvementSuggestions: improvementSuggestions,
+
+        // Evidence-based insights derived only from resume text
+        evidenceStrengths: evidenceInsights.strengths,
+        evidenceWeaknesses: evidenceInsights.weaknesses,
 
         // OVERALL ATS SCORE (based on ensemble of agents + validation)
         overallScore: overallAtsScore,

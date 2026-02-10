@@ -176,64 +176,9 @@ export default function ATSPage() {
     const jobKeywords = extractKeywords(jobDesc)
     const hasJobDescription = jobDesc.trim().length > 20
 
-    // ALL content comes from AI - no templates!
-    const strengths: string[] = []
-    const weaknesses: string[] = []
-
-    // Get RL agent analysis
-    const rlDecision = aiData?.rlAgentDecision
-    const richFeatures = rlDecision?.features || {}
-    
-    if (rlDecision) {
-      // Build strengths from actual feature scores
-      if (richFeatures.technicalScore >= 75) {
-        strengths.push(`✓ Strong technical background (Score: ${richFeatures.technicalScore}/100)`)
-      }
-      if (richFeatures.leadershipScore >= 70) {
-        strengths.push(`✓ Demonstrated leadership experience (Score: ${richFeatures.leadershipScore}/100)`)
-      }
-      if (richFeatures.communicationScore >= 70) {
-        strengths.push(`✓ Professional communication skills (Score: ${richFeatures.communicationScore}/100)`)
-      }
-      if (richFeatures.experienceYears >= 5) {
-        strengths.push(`✓ Substantial work experience (${richFeatures.experienceYears} years)`)
-      }
-      if (richFeatures.educationLevel >= 7) {
-        strengths.push(`✓ Advanced education credentials (Level: ${richFeatures.educationLevel}/10)`)
-      }
-      
-      // Build weaknesses from low scores
-      if (richFeatures.technicalScore < 60) {
-        weaknesses.push(`✕ Technical skills need development (Score: ${richFeatures.technicalScore}/100)`)
-      }
-      if (richFeatures.communicationScore < 60) {
-        weaknesses.push(`✕ Communication could be improved (Score: ${richFeatures.communicationScore}/100)`)
-      }
-      if (richFeatures.experienceYears < 2) {
-        weaknesses.push(`✕ Early career stage (${richFeatures.experienceYears} years experience)`)
-      }
-      if (richFeatures.leadershipScore < 40) {
-        weaknesses.push(`✕ Limited leadership experience shown in resume`)
-      }
-      
-      // Add decision summary with reasoning
-      if (rlDecision.decision === 'HIRE') {
-        strengths.push(`🤖 AI Decision: HIRE | Confidence: ${rlDecision.confidence}`)
-        if (rlDecision.reasoning) {
-          strengths.push(`Reasoning: ${rlDecision.reasoning}`)
-        }
-      } else if (rlDecision.decision === 'REJECT') {
-        weaknesses.push(`❌ AI Decision: REJECT | Confidence: ${rlDecision.confidence}`)
-        if (rlDecision.reasoning) {
-          weaknesses.push(`Reasoning: ${rlDecision.reasoning}`)
-        }
-      } else {
-        weaknesses.push(`⚠️ AI Decision: CONSIDER | Confidence: ${rlDecision.confidence}`)
-        if (rlDecision.reasoning) {
-          weaknesses.push(`Reasoning: ${rlDecision.reasoning}`)
-        }
-      }
-    }
+    // Evidence-based strengths/weaknesses from API
+    const strengths: string[] = Array.isArray(aiData?.evidenceStrengths) ? aiData.evidenceStrengths : []
+    const weaknesses: string[] = Array.isArray(aiData?.evidenceWeaknesses) ? aiData.evidenceWeaknesses : []
 
     // Extract matched/missing keywords
     let matched: string[] = []
