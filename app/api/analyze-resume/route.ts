@@ -1614,39 +1614,18 @@ export async function POST(request: NextRequest) {
           final: overallAtsScore
         },
         
-        // 🤖 REINFORCEMENT LEARNING AGENT DECISION
+        // 🤖 AI HIRING DECISION
         rlAgentDecision: {
           decision: rlDecision.decision,
           confidence: (rlDecision.confidenceScore * 100).toFixed(1) + '%',
-          qValue: rlDecision.qValue.toFixed(4),
-          predictedSuccess: (rlDecision.predictedSuccessRate * 100).toFixed(1) + '%',
           reasoning: rlDecision.reasoning,
-          candidateId: rlDecision.candidateId,
-          features: rlFeatures,
-          algorithm: "Deterministic ATS Scoring (Override)",
-          isRealAI: true
         },
         // Intelligent Neural Agent decision (if enabled)
         intelligentAgentDecision: intelligentDecision ? {
           decision: intelligentDecision.decision,
-          score: intelligentDecision.score,
           confidence: intelligentDecision.confidence,
           reasoning: intelligentDecision.reasoning,
-          agentThinking: intelligentDecision.agentThinking
         } : null,
-        
-        modelInfo: {
-          semanticModel: "sentence-transformers/all-mpnet-base-v2 (Advanced)",
-          qualityModel: "roberta-large-mnli (Advanced zero-shot reasoning)",
-          nerModel: "xlm-roberta-large-finetuned-conll03 (Advanced entity recognition)",
-          sentimentModel: "roberta-large-mnli (Advanced sentiment analysis)",
-          rlAgent: "Q-Learning with 1.7M state space (Real Reinforcement Learning)",
-          intelligentAgentIncluded: ENABLE_INTELLIGENT ? true : false,
-          architecture: "State-of-the-Art Pre-trained Transformer Models + RL Decision Making",
-          trainingData: "Billions of text examples from web with reinforced learning",
-          isGenericAI: true,
-          description: "Uses advanced pre-trained transformer neural networks with chain-of-thought reasoning + Q-Learning RL agent that learns optimal hiring decisions."
-        },
       },
       agentErrors,
     })
