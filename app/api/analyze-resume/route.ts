@@ -496,19 +496,22 @@ const generateAISuggestions = async (
         suggestions: formatSuggestions
       })
     } else {
-      // CRITICAL FIX: Only show bullet count if we actually found bullets in formatting
-      // Don't show misleading "All 0 bullet points" message
+      // CRITICAL FIX: Consistent bullet detection across all suggestions
+      // Check both parsed bullets AND actual bullet symbols in resume
       const hasBullets = bulletPoints.length > 0
-      const hasBulletSymbols = /[•\-▪►·]/.test(resumeText)
+      const hasBulletSymbols = /[•\-▪►·]|\d+\.|\d+\)/.test(resumeText)
+      const bulletDetected = hasBullets || hasBulletSymbols
       
       const formattingRemarks = [
-        hasBullets || hasBulletSymbols 
+        bulletDetected
           ? `✅ Your resume uses ATS-compatible formatting with standard bullets (•, -).`
           : `ATS-compatible formatting detected. Consider using standard bullet points (• or -) for better scannability.`,
         `Cleanliness score: 100% - No problematic special characters detected.`,
-        hasBullets && bulletPoints.length > 0
-          ? `Bullet points detected: ${bulletPoints.length} formatted items. ${bulletPoints.length > 5 ? "Good coverage." : "Consider adding more detail to bullets."}`
-          : "No bullet-formatted content detected in this analysis.",
+        bulletDetected && bulletPoints.length > 0
+          ? `Bullet points detected: ${bulletPoints.length} formatted items.`
+          : bulletDetected
+            ? `Bullet formatting detected. Well-structured presentation.`
+            : "No bullet points currently used. Consider adding bullets to highlight achievements.",
         `Continue using consistent, simple formatting for optimal ATS compatibility.`
       ]
       
@@ -564,12 +567,12 @@ const generateAISuggestions = async (
         ? `Missing recommended sections: ${missingSections.join(", ")}.`
         : "All core resume sections are present.",
       `Structure validation: ${analysisData.validationScore}% completeness. ${analysisData.validationScore >= 80 ? "Excellent parsing compatibility." : "Some sections may be missing or poorly labeled."}`,
-      // CRITICAL: Only report specific bullet count if we actually parsed them; otherwise use conservative message
+      // CRITICAL: Consistent bullet reporting with Formatting section
       bulletDescriptions.length > 0
         ? `${bulletDescriptions.length} descriptive bullet points found. Average length: ${Math.round(accurateAvgBulletLength)} characters - ${accurateAvgBulletLength > 150 ? "detailed and comprehensive" : bulletDescriptions.length >= 5 ? "moderate depth" : "consider expanding where possible"}.`
-        : (hasBulletsInResume && hasMultipleSections)
-          ? `Bullet-formatted content detected. Structure is well-organized with clear sections.`
-          : "Consider adding bullet points to highlight key achievements and responsibilities."
+        : (hasBulletsInResume)
+          ? `✅ Bullet points detected. Resume structure is well-organized with clear content hierarchy.`
+          : "Consider adding structured bullet points to better organize achievements and responsibilities."
     ]
     
     suggestions.push({

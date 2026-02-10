@@ -428,7 +428,33 @@ export class AIAgentEngine {
       action = actions[Math.floor(this.rnd() * 3)];
     }
     
-    const reasoning = this.generateReasoning(features, action, jobDescription);
+    // ABSOLUTE FINAL CHECK: Ensure decision makes sense with confidence
+    // This is a HARD GUARANTEE that prevents nonsensical outputs
+    const atsScoreFromFeatures = Math.round(
+      (features.technicalScore * 0.28 +
+       Math.min(features.experienceYears / 8, 1) * 20 +
+       (features.communicationScore / 100) * 18 +
+       (features.cultureFitScore / 100) * 15 +
+       (features.educationLevel / 10) * 12 +
+       (features.leadershipScore / 100) * 7) / 1.2
+    );
+    
+    console.log(`[RL AGENT FINAL CHECK] ATS Score from features: ${atsScoreFromFeatures}, Decision: ${action}, Confidence: ${confidenceScore}`);
+    
+    // HARD OVERRIDE: If ATS score from features is high (>70), never REJECT
+    if (atsScoreFromFeatures >= 70 && action === 'reject') {
+      console.log(`[RL AGENT OVERRIDE] High ATS score (${atsScoreFromFeatures}) but REJECT action detected - FORCING HIRE`);
+      action = 'hire';
+      confidenceScore = Math.min(1.0, atsScoreFromFeatures / 100);
+    }
+    
+    // HARD OVERRIDE: If ATS score is > 80, ALWAYS HIRE
+    if (atsScoreFromFeatures >= 80 && action !== 'hire') {
+      console.log(`[RL AGENT OVERRIDE] ATS score ${atsScoreFromFeatures} >= 80 - FORCING HIRE`);
+      action = 'hire';
+      confidenceScore = Math.min(1.0, atsScoreFromFeatures / 100);
+    }
+    
     
     const decision: HiringDecision = {
       candidateId: this.deterministic ? `candidate-${this._deterministicCounter++}` : `candidate-${Date.now()}`,
