@@ -1366,11 +1366,14 @@ export async function POST(request: NextRequest) {
 
     // SKILLS QUALITY scoring - INDUSTRY ALIGNED (more generous)
     let skillsScore = 0
-    if (jobSkills.length > 0) {
+    const hasJobDescription = jobSkills.length > 0
+    if (hasJobDescription) {
       // Job-specific match percentage + bonus for demonstrating depth
       const baseMatch = Math.max(50, skillMatchPercentage)  // Floor at 50 for any skills presence
       const depthBonus = matchedSkills.length > 5 ? 15 : matchedSkills.length > 3 ? 10 : 5
-      skillsScore = Math.min(100, baseMatch + depthBonus)
+      // BONUS: If semantic score is also high, give extra boost (shows overall fit)
+      const relevanceBonus = semanticScore > 0.75 ? 8 : semanticScore > 0.65 ? 5 : 0
+      skillsScore = Math.min(100, baseMatch + depthBonus + relevanceBonus)
     } else {
       // No job description: reward depth (industry standard is generous here)
       if (detectedSkills.length < 3) skillsScore = 45  // Raised from 20
@@ -1381,10 +1384,16 @@ export async function POST(request: NextRequest) {
       else skillsScore = 96  // Raised from 95
     }
 
-    // ROLE LEVEL detection for adaptive weighting
+    // ROLE LEVEL detection for adaptive weighting (including FRESHER)
     const seniorKeywords = (resume.match(/senior|lead|principal|architect|director|manager|vp|head of|chief/gi) || []).length
     const juniorKeywords = (resume.match(/intern|junior|entry.level|associate|assistant|trainee/gi) || []).length
-    const roleLevel = seniorKeywords > juniorKeywords ? 'senior' : juniorKeywords > 1 ? 'junior' : 'mid'
+    const fresherKeywords = (resume.match(/fresher|graduate|recent graduate|looking for first|entry level|no experience|seeking opportunity/gi) || []).length
+    
+    let roleLevel = 'mid'
+    if (experienceYears < 0.5 || fresherKeywords > 0) roleLevel = 'fresher'
+    else if (seniorKeywords > juniorKeywords && experienceYears >= 5) roleLevel = 'senior'
+    else if (juniorKeywords > 1 || experienceYears < 2) roleLevel = 'junior'
+    else roleLevel = 'mid'
 
     // LENGTH normalization - INDUSTRY ALIGNED (less harsh penalties)
     const wordCount = resume.split(/\s+/).length
@@ -1400,7 +1409,15 @@ export async function POST(request: NextRequest) {
     // Component scores with INDUSTRY-STANDARD BASELINES
     const parsingScore = Math.max(60, Math.min(100, validationScore || 60))  // Floor at 60
     const contentScore = Math.max(55, Math.min(100, resumeQuality.professionalScore || 55))  // Floor at 55
-    const relevanceScore = Math.max(65, Math.min(100, Math.round(semanticScore * 100)))  // Floor at 65
+    
+    // RELEVANCE with JOB DESCRIPTION BOOST
+    let relevanceScore = Math.max(65, Math.min(100, Math.round(semanticScore * 100)))  // Floor at 65
+    if (hasJobDescription && semanticScore > 0.7) {
+      // High semantic match when job provided = significant advantage
+      const jobMatchBonus = Math.round((semanticScore - 0.7) * 50)  // Up to +15 points for 1.0 match
+      relevanceScore = Math.min(100, relevanceScore + jobMatchBonus)
+    }
+    
     const impactScore = Math.max(30, Math.min(100, metricCoverage))  // Floor at 30
     const clarityScore = Math.max(50, Math.min(
       100,
@@ -1412,9 +1429,21 @@ export async function POST(request: NextRequest) {
       )
     ))  // Floor at 50
 
-    // ADAPTIVE WEIGHTING based on role level
+    // ADAPTIVE WEIGHTING based on role level (including FRESHER)
     let industryScore = 0
-    if (roleLevel === 'senior') {
+    if (roleLevel === 'fresher') {
+      // FRESHER: Minimize experience weight, maximize skills/education/relevance
+      industryScore = Math.round(
+        (parsingScore * 0.16) +      // Format matters for freshers
+        (contentScore * 0.20) +      // Content quality shows effort
+        (relevanceScore * 0.24) +    // CRITICAL: Job fit is everything for freshers
+        (skillsScore * 0.26) +       // CRITICAL: Skills show potential
+        (experienceScore * 0.03) +   // Minimal weight on experience
+        (impactScore * 0.04) +       // Projects/academic impact
+        (clarityScore * 0.05) +
+        (lengthScore * 0.02)
+      )
+    } else if (roleLevel === 'senior') {
       industryScore = Math.round(
         (parsingScore * 0.10) +
         (contentScore * 0.18) +
@@ -1437,6 +1466,7 @@ export async function POST(request: NextRequest) {
         (lengthScore * 0.02)
       )
     } else {
+      // Mid-level
       industryScore = Math.round(
         (parsingScore * 0.15) +
         (contentScore * 0.20) +
