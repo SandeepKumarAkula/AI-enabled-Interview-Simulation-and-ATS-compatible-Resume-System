@@ -129,24 +129,45 @@ export class AIAgentEngine {
    * Pre-train on simulated hiring data
    */
   private preTrainOnSimulatedData(): void {
-    // ENHANCED: 25x more training data with real-world diversity
-    const simulatedDecisions = this.generateSimulatedHiringData(250000)
+    // ULTIMATE SCALE: 1 billion training decisions via streaming batches
+    const batchSize = 10000;  // Generate 10K at a time
+    const totalBatches = 100000;  // 100,000 batches × 10,000 = 1 BILLION decisions
     
-    for (const decision of simulatedDecisions) {
-      const state = this.quantizeFeatures(decision.features)
-      const nextState = this.quantizeFeatures({
-        technicalScore: Math.min(100, decision.features.technicalScore + 10),
-        experienceYears: Math.min(50, decision.features.experienceYears + 2),
-        educationLevel: decision.features.educationLevel,
-        communicationScore: Math.min(100, decision.features.communicationScore + 5),
-        leadershipScore: Math.min(100, decision.features.leadershipScore + 5),
-        cultureFitScore: Math.min(100, decision.features.cultureFitScore + 5)
-      })
+    console.log('🚀 Starting Q-Learning pre-training: 1 BILLION decisions...');
+    
+    let processedCount = 0;
+    const startTime = Date.now();
+    
+    for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+      // Generate batch on-demand to avoid memory overload
+      const batchData = this.generateSimulatedHiringData(batchSize);
       
-      const reward = decision.hired ? 1.0 : 0.0
-      const action = decision.hired ? 'hire' : 'reject'
-      this.updateQValue(state, action, reward, nextState)
+      for (const decision of batchData) {
+        const state = this.quantizeFeatures(decision.features);
+        const nextState = this.quantizeFeatures({
+          technicalScore: Math.min(100, decision.features.technicalScore + 10),
+          experienceYears: Math.min(50, decision.features.experienceYears + 2),
+          educationLevel: decision.features.educationLevel,
+          communicationScore: Math.min(100, decision.features.communicationScore + 5),
+          leadershipScore: Math.min(100, decision.features.leadershipScore + 5),
+          cultureFitScore: Math.min(100, decision.features.cultureFitScore + 5)
+        });
+        
+        const reward = decision.hired ? 1.0 : 0.0;
+        const action = decision.hired ? 'hire' : 'reject';
+        this.updateQValue(state, action, reward, nextState);
+        processedCount++;
+      }
+      
+      // Log progress every 10 million
+      if ((batchNum + 1) % 1000 === 0) {
+        const elapsed = (Date.now() - startTime) / 1000;
+        console.log(`✅ Q-Trained on ${processedCount.toLocaleString()} decisions (${Math.round((batchNum + 1) / totalBatches * 100)}%) - ${(elapsed).toFixed(1)}s elapsed`);
+      }
     }
+    
+    const totalTime = (Date.now() - startTime) / 1000;
+    console.log(`🏆 Q-LEARNING COMPLETE: 1,000,000,000 decisions trained in ${totalTime.toFixed(1)}s`);
   }
 
   /**
