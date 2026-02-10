@@ -125,6 +125,12 @@
   }
 }
 
+/* Prevent browser-native password reveal icons from duplicating custom toggle */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+
 /* Site badge tooltip styles - cursor following */
 .site-badge-tooltip {
   position: fixed;
