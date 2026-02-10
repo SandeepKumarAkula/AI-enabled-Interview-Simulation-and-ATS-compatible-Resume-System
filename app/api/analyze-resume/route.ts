@@ -508,6 +508,15 @@ const generateAISuggestions = async (
       !hasCertifications && "Certifications"
     ].filter(Boolean)
 
+    // Calculate accurate average bullet description length
+    const bulletDescriptions = bulletPoints.filter(b => {
+      const desc = b.replace(BULLET_PATTERN, '').trim()
+      return desc.length > 0
+    })
+    const accurateAvgBulletLength = bulletDescriptions.length > 0 
+      ? bulletDescriptions.reduce((sum, b) => sum + b.replace(BULLET_PATTERN, '').trim().length, 0) / bulletDescriptions.length 
+      : 0
+
     const structureSuggestions = [
       presentSections.length > 0
         ? `Detected ${presentSections.length} key sections: ${presentSections.join(" → ")}`
@@ -516,8 +525,8 @@ const generateAISuggestions = async (
         ? `Missing recommended sections: ${missingSections.join(", ")}.`
         : "All core resume sections are present.",
       `Structure validation: ${analysisData.validationScore}% completeness. ${analysisData.validationScore >= 80 ? "Excellent parsing compatibility." : "Some sections may be missing or poorly labeled."}`,
-      bulletPoints.length > 0 || /[•▪►·]/.test(resumeText)
-        ? `Average bullet description length: ${Math.round(avgBulletLength)} characters - ${avgBulletLength > 150 ? "descriptions are detailed and impactful" : "consider adding more detail to bullets"}.`
+      bulletDescriptions.length > 0 || /[•▪►·]/.test(resumeText)
+        ? `Average bullet description length: ${Math.round(accurateAvgBulletLength)} characters - ${accurateAvgBulletLength > 150 ? "descriptions are detailed and impactful" : bulletDescriptions.length > 0 ? "consider adding more detail to bullets" : "no content in bullets"}.`
         : "No bullet points detected - add concise bullet statements under each role or project."
     ]
     
@@ -1027,23 +1036,40 @@ export async function POST(request: NextRequest) {
     let experienceYears = 0;
     if (experienceMatch && experienceMatch[1]) {
       experienceYears = Math.min(50, parseFloat(experienceMatch[1]));
+    } else {
+      // Fallback: count job entries to estimate years
+      const jobEntries = (resume.match(/(?:worked at|worked for|employed at|at\s+\w+|company|position|role)[\s:]/gi) || []).length;
+      experienceYears = Math.min(50, jobEntries * 2.5); // Estimate ~2.5 years per job
     }
     
     // Calculate leadership score more accurately (count keywords and cap at 100)
-    const leadershipKeywords = resume.match(/(?:led|managed|supervised|coordinated|directed|headed|spearheaded|oversaw|mentored|team lead|project lead)/gi) || [];
-    const leadershipScore = Math.min(100, Math.max(0, leadershipKeywords.length * 10)); // Better scaling
+    const leadershipKeywords = resume.match(/(?:led|managed|supervised|coordinated|directed|headed|spearheaded|oversaw|mentored|team lead|project lead|chief|director|manager|head of)/gi) || [];
+    const leadershipScore = Math.min(100, Math.max(0, Math.min(100, leadershipKeywords.length * 8))); // Better scaling
+    
+    // Calculate technical score based on multiple factors
+    const techKeywordCount = (resume.match(/(?:developed|designed|architected|engineered|built|implemented|created|programmed)/gi) || []).length;
+    const detailedTechScore = (detectedSkills.length * 3) + (techKeywordCount * 2);
     
     // Ensure culture fit is properly converted from 0-1 range to 0-100
     const cultureFitValue = Math.round(semanticScore * 100); // Already in 0-1 scale from similarity
     
+    // Calculate communication score based on tone and content quality
+    let communicationScore = Math.round(resumeTone.score * 100);
+    if (communicationScore === 0 || !communicationScore) {
+      // Fallback: calculate from actual resume content
+      const professionalTerms = (resume.match(/collaborated|communicated|presented|articulated|discussed|aligned|coordinated|liaison|interface|stakeholder/gi) || []).length;
+      const actionVerbsComm = (resume.match(/led|managed|coordinated|directed|influenced|championed|spearheaded/gi) || []).length;
+      communicationScore = Math.min(100, 50 + (professionalTerms * 3) + (actionVerbsComm * 2));
+    }
+    
     const rlFeatures: ResumFeatures = {
-      technicalScore: Math.min(100, Math.max(0, detectedSkills.length * 4)), // Cap at 100
+      technicalScore: Math.min(100, Math.max(20, detailedTechScore)), // Between 20-100, minimum of 20 for any valid resume
       experienceYears: experienceYears, // Proper years extraction
       educationLevel: resume.match(/(?:phd|doctorate)/i) ? 10 : 
                     resume.match(/(?:master|msc|ms|mba)/i) ? 7 :
                     resume.match(/(?:bachelor|ba|bs|bsc)/i) ? 5 : 
                     resume.match(/(?:diploma|certificate)/i) ? 3 : 2,
-      communicationScore: Math.min(100, Math.max(0, Math.round(resumeTone.score * 100))), // Proper scaling
+      communicationScore: Math.min(100, Math.max(30, communicationScore)), // Proper scaling with minimum of 30
       leadershipScore: leadershipScore, // Better calculated and capped
       cultureFitScore: Math.min(100, Math.max(0, cultureFitValue)) // Properly scaled 0-100
     };

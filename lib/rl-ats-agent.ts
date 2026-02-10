@@ -393,39 +393,50 @@ export class AIAgentEngine {
     
     let action: 'hire' | 'reject' | 'consider';
     
-    // BALANCED DECISION THRESHOLDS - Not too strict
-    // 0.55+ = HIRE (top 45%)
-    // 0.35-0.55 = CONSIDER (middle 40%)
-    // Below 0.35 = REJECT (bottom 15%)
-    // LENIENT thresholds - more accepting, 10% liberal
+    // FIXED DECISION THRESHOLDS - Better alignment with feature scores
+    // High score (0.70+) = HIRE
+    // Medium score (0.40-0.70) = CONSIDER  
+    // Low score (<0.40) = REJECT
     
     if (this.rnd() < this.explorationRate) {
-      // Explore: random action
+      // Explore: random action (minimal for production stability)
       const actions = ['hire', 'reject', 'consider'] as const;
       action = actions[Math.floor(this.rnd() * 3)];
     } else {
-      // Exploit with LENIENT thresholds - 10% more liberal
-      // HIRE: 0.50+ (top 50%) - Accept half of good candidates
-      // CONSIDER: 0.30-0.50 (next 35%) - Give more chances
-      // REJECT: <0.30 (bottom 15%) - Only clearly unsuitable
-      if (hireScore >= 0.50) {
+      // Exploit with improved thresholds aligned to feature scores
+      const maxScore = Math.max(hireScore, considerScore, rejectScore);
+      
+      // Primary decision based on which score is highest AND meets minimum threshold
+      if (hireScore >= 0.65 && hireScore === maxScore) {
         action = 'hire';
-      } else if (considerScore >= 0.30 && considerScore > (rejectScore * 0.75)) {
+      } else if (considerScore >= 0.45 && considerScore >= hireScore && considerScore > rejectScore) {
         action = 'consider';
-      } else {
+      } else if (adjustedFeatureScore < 0.40) {
+        // Low feature score = reject
         action = 'reject';
+      } else {
+        // Default: use feature score directly
+        action = (adjustedFeatureScore >= 0.65) ? 'hire' : (adjustedFeatureScore >= 0.45) ? 'consider' : 'reject';
       }
     }
     
     // Calculate confidence score properly (0-1 normalized range)
+    // Confidence should reflect how confident we are in the decision, not just the score
     let confidenceScore = 0;
+    let baseConfidence = 0;
+    
     if (action === 'hire') {
-      confidenceScore = Math.min(1.0, Math.max(0, hireScore)); // Clamp to 0-1
+      baseConfidence = Math.min(1.0, Math.max(0, hireScore)); // Clamp to 0-1
     } else if (action === 'consider') {
-      confidenceScore = Math.min(1.0, Math.max(0, considerScore)); // Clamp to 0-1
+      baseConfidence = Math.min(1.0, Math.max(0, considerScore)); // Clamp to 0-1
     } else {
-      confidenceScore = Math.min(1.0, Math.max(0, rejectScore)); // Clamp to 0-1
+      baseConfidence = Math.min(1.0, Math.max(0, rejectScore)); // Clamp to 0-1
     }
+    
+    // Boost confidence for high feature scores
+    // If adjusted feature score is high, we should be more confident in our decision
+    const featureConfidenceBoost = Math.min(0.15, adjustedFeatureScore * 0.15);
+    confidenceScore = Math.min(1.0, baseConfidence + featureConfidenceBoost);
     
     const reasoning = this.generateReasoning(features, action, jobDescription);
     
