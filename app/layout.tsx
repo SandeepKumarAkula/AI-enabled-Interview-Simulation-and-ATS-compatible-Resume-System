@@ -15,8 +15,12 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
+export const metadata: Metadata = {
   title: "AI²SARS - AI-enabled Interview Simulation & ATS Resume System",
   description: "Build your perfect resume with professional templates and real-time preview",
+  verification: {
+    google: "KPRdCQ3skCNPcxHIh_TONCEmmKasRl4pdFe0dq95zy0",
+  },
   icons: {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50' y='75' font-size='80' font-weight='bold' text-anchor='middle' fill='%232ecc71'>A</text></svg>",
   },
